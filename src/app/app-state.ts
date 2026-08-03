@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { RouteBundle, TripIndexEntry } from '../core/types';
+import type { SavedTrip } from '../core/offline';
 import type { OperatorId } from '../core/operators';
 import type { Screen } from './screens';
 
@@ -10,19 +11,19 @@ export interface AppState {
   /** Обраний рейс; переживає перезапуск (settings.lastTripId + бандл із Dexie). */
   currentTrip: RouteBundle | null;
   screen: Screen;
-  /** tripId усіх бандлів у Dexie — бейдж «збережено» і робота офлайн. */
-  savedTripIds: string[];
+  /** Пакети в Dexie: бейдж «офлайн-готовий», офлайн-список і бейдж оновлення. */
+  savedTrips: SavedTrip[];
   /** tripId рейсу, який зараз завантажується (індикатор на картці). */
   loadingTripId: string | null;
   toast: string | null;
 }
 
 export type AppAction =
-  | { type: 'hydrated'; operator: OperatorId | null; trip: RouteBundle | null; saved: string[] }
+  | { type: 'hydrated'; operator: OperatorId | null; trip: RouteBundle | null; saved: SavedTrip[] }
   | { type: 'operator'; operator: OperatorId }
   | { type: 'screen'; screen: Screen }
   | { type: 'select-start'; tripId: string }
-  | { type: 'select-done'; bundle: RouteBundle; screen: Screen }
+  | { type: 'select-done'; bundle: RouteBundle; screen: Screen; saved: SavedTrip[] }
   | { type: 'select-fail'; message: string }
   | { type: 'bundles-cleared' }
   | { type: 'toast'; message: string | null };
@@ -32,7 +33,7 @@ export const initialAppState: AppState = {
   operator: null,
   currentTrip: null,
   screen: 'home',
-  savedTripIds: [],
+  savedTrips: [],
   loadingTripId: null,
   toast: null,
 };
@@ -45,7 +46,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         hydrated: true,
         operator: action.operator,
         currentTrip: action.trip,
-        savedTripIds: action.saved,
+        savedTrips: action.saved,
       };
     case 'operator':
       return { ...state, operator: action.operator };
@@ -59,15 +60,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         loadingTripId: null,
         currentTrip: action.bundle,
         screen: action.screen,
-        savedTripIds: state.savedTripIds.includes(action.bundle.tripId)
-          ? state.savedTripIds
-          : [...state.savedTripIds, action.bundle.tripId],
+        savedTrips: action.saved,
       };
     case 'select-fail':
       return { ...state, loadingTripId: null, toast: action.message };
     // Екран не чіпаємо: якщо це був Trip, App сам поверне на Home (currentTrip зник).
     case 'bundles-cleared':
-      return { ...state, savedTripIds: [], currentTrip: null };
+      return { ...state, savedTrips: [], currentTrip: null };
     case 'toast':
       return { ...state, toast: action.message };
   }
@@ -76,8 +75,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 export interface AppActions {
   setOperator: (operator: OperatorId) => void;
   setScreen: (screen: Screen) => void;
-  /** Бандл із Dexie або з мережі → Dexie → екран Trip. */
-  selectTrip: (entry: TripIndexEntry) => Promise<void>;
+  /**
+   * Бандл із Dexie або з мережі → Dexie → екран Trip.
+   * `force` — перекачати попри збережену копію (кнопка «оновити розклад»).
+   */
+  selectTrip: (entry: TripIndexEntry, options?: { force?: boolean }) => Promise<void>;
   /** «Продовжити»: бандл уже в пам'яті, лишається перейти на Trip. */
   openCurrentTrip: () => void;
   clearBundles: () => Promise<void>;

@@ -44,8 +44,12 @@ const POLAND_CENTER: [number, number] = [19.0, 51.7];
 const POLAND_ZOOM = 5.5;
 
 /**
- * Растровий OSM — тимчасово. У задачі 07 його замінить PMTiles,
- * тому вся робота з картою має жити тільки в цьому компоненті.
+ * Растровий OSM — базова карта, коли є мережа.
+ *
+ * Офлайн її замінює BLANK_STYLE (задача 07): тайли з інтернету в дорозі не
+ * приходять, а тягнути їх із SW-кеша безглуздо — користувач бачив дай боже
+ * кілька екранів. Коридорні PMTiles відкладені (рішення — docs/07-offline-pwa.md),
+ * тож офлайн-карта — це лінія маршруту й зони на темному фоні.
  */
 const RASTER_OSM_STYLE: StyleSpecification = {
   version: 8,
@@ -59,6 +63,13 @@ const RASTER_OSM_STYLE: StyleSpecification = {
     },
   },
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+};
+
+/** Офлайн-стиль: жодного мережевого джерела, тільки фон під наші шари. */
+const BLANK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {},
+  layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#0b1120' } }],
 };
 
 function routeBounds(route: GeoJSON.Feature<GeoJSON.LineString>): LngLatBoundsLike {
@@ -86,6 +97,8 @@ export interface MapProps {
 export function Map({ route, stops, zones, onZoneSelect, tracker }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  /** Чи є під нами базова карта. Офлайн — ні, і про це треба сказати вголос. */
+  const [basemap, setBasemap] = useState(() => navigator.onLine);
   const [follow, setFollow] = useState(true);
   const followRef = useRef(follow);
   followRef.current = follow;
@@ -103,7 +116,9 @@ export function Map({ route, stops, zones, onZoneSelect, tracker }: MapProps) {
     // чи вже виміряний контейнер, і на повільному старті може не спрацювати.
     const map = new MapLibreMap({
       container,
-      style: RASTER_OSM_STYLE,
+      // Офлайн растровий стиль дав би сотні провалених запитів у консоль
+      // і сіру шахівницю замість карти.
+      style: navigator.onLine ? RASTER_OSM_STYLE : BLANK_STYLE,
       attributionControl: { compact: true },
       ...(route
         ? { bounds: routeBounds(route), fitBoundsOptions: { padding: FIT_PADDING } }
@@ -173,8 +188,19 @@ export function Map({ route, stops, zones, onZoneSelect, tracker }: MapProps) {
       });
     };
 
+    // `style.load` слухаємо завжди: зміна стилю (онлайн ↔ офлайн) зносить наші
+    // джерела разом зі старим стилем, і їх треба покласти назад.
+    map.on('style.load', addRouteLayer);
     if (map.isStyleLoaded()) addRouteLayer();
-    else map.on('style.load', addRouteLayer);
+
+    // Мережа зникла посеред поїздки — знімаємо базову карту, лишаємо маршрут.
+    const onNetworkChange = () => {
+      const online = navigator.onLine;
+      setBasemap(online);
+      map.setStyle(online ? RASTER_OSM_STYLE : BLANK_STYLE);
+    };
+    window.addEventListener('online', onNetworkChange);
+    window.addEventListener('offline', onNetworkChange);
 
     // Не `new Map(...)`: у цьому файлі `Map` — це наш компонент, а не колекція.
     const byId: Record<string, DeadZone> = {};
@@ -239,6 +265,8 @@ export function Map({ route, stops, zones, onZoneSelect, tracker }: MapProps) {
 
     return () => {
       unsubscribe?.();
+      window.removeEventListener('online', onNetworkChange);
+      window.removeEventListener('offline', onNetworkChange);
       map.off('dragstart', onDragStart);
       applyRef.current = null;
       me.remove();
@@ -251,6 +279,7 @@ export function Map({ route, stops, zones, onZoneSelect, tracker }: MapProps) {
   return (
     <div className="map-wrap">
       <div ref={containerRef} className="map-container" />
+      {!basemap && <div className="map-note">офлайн · без базової карти</div>}
       {tracker && (
         <button
           type="button"

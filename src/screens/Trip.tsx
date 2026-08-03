@@ -6,7 +6,9 @@ import { TripStatusBar } from '../components/TripStatusBar';
 import { ZoneSheet } from '../components/ZoneSheet';
 import { useAppActions, useAppState } from '../app/app-state';
 import { useEtaStore } from '../app/useEta';
-import { useTripTracker } from '../app/useTrip';
+import { useTripTracker, useTripTracking } from '../app/useTrip';
+import { useTripSession, useTripSessionSync } from '../app/useTripSession';
+import { setTripSession } from '../core/trip-session';
 import { formatKm, formatTime } from '../core/format';
 import { operatorLabel } from '../core/operators';
 import type { OperatorId } from '../core/operators';
@@ -15,22 +17,42 @@ import type { DeadZone, RouteBundle } from '../core/types';
 type View = 'ribbon' | 'map';
 
 export function Trip() {
-  const { currentTrip, operator } = useAppState();
+  const { currentTrip, operator, savedTrips } = useAppState();
 
   // Редірект робить App; сюди потрапляємо лише на кадр між dispatch і ререндером.
   if (!currentTrip) return null;
 
   // key: інший рейс — інший трекер, інша стрічка, все з нуля.
-  return <TripView key={currentTrip.tripId} bundle={currentTrip} operator={operator} />;
+  return (
+    <TripView
+      key={currentTrip.tripId}
+      bundle={currentTrip}
+      operator={operator}
+      offlineReady={savedTrips.some((trip) => trip.tripId === currentTrip.tripId)}
+    />
+  );
 }
 
-function TripView({ bundle, operator }: { bundle: RouteBundle; operator: OperatorId | null }) {
+interface TripViewProps {
+  bundle: RouteBundle;
+  operator: OperatorId | null;
+  /** Пакет лежить у Dexie — рейс переживе airplane mode. */
+  offlineReady: boolean;
+}
+
+function TripView({ bundle, operator, offlineReady }: TripViewProps) {
   const { setScreen } = useAppActions();
   const tracker = useTripTracker(bundle);
   const etaStore = useEtaStore(tracker);
+  const tracking = useTripTracking(tracker);
   const [view, setView] = useState<View>('ribbon');
   /** Один шит на екран: його відкривають і стрічка, і карта. */
   const [zone, setZone] = useState<DeadZone | null>(null);
+
+  useTripSessionSync(tracker, bundle.tripId);
+  const session = useTripSession();
+  // iOS вбив PWA посеред поїздки: трекера вже немає, а запис лишився.
+  const interrupted = !tracking && session?.tripId === bundle.tripId;
 
   const last = bundle.stops[bundle.stops.length - 1];
   const zonesCount = bundle.deadZones.length;
@@ -48,7 +70,26 @@ function TripView({ bundle, operator }: { bundle: RouteBundle; operator: Operato
         {formatTime(bundle.stops[0]?.dep ?? null)} → {formatTime(last?.arr ?? null)} ·{' '}
         {formatKm(bundle.lengthKm)} · {bundle.stops.length} зупинок ·{' '}
         {zonesCount ? `${zonesCount} мертвих зон` : 'зон не знайдено'}
+        {offlineReady && <span className="badge badge--saved">📦 офлайн-готовий</span>}
       </div>
+
+      {interrupted && (
+        <div className="banner banner--warn banner--action">
+          <span>Поїздка перервалась. Продовжити відстеження?</span>
+          <span className="banner__buttons">
+            <button type="button" className="button button--inline" onClick={() => tracker.start()}>
+              Продовжити
+            </button>
+            <button
+              type="button"
+              className="button button--inline button--ghost"
+              onClick={() => setTripSession(null)}
+            >
+              Ні
+            </button>
+          </span>
+        </div>
+      )}
 
       <EtaHeader store={etaStore} />
       <TripStatusBar tracker={tracker} />

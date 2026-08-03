@@ -29,6 +29,15 @@ export function useTripTracker(bundle: RouteBundle): TripTracker {
   return tracker;
 }
 
+/**
+ * Тільки прапорець трекінгу. Окремо від `useTripSnapshot`, бо підписник —
+ * екран поїздки цілком: ререндерити його на кожен фікс було б марно.
+ */
+export function useTripTracking(tracker: TripTracker): boolean {
+  const subscribe = useCallback((listener: () => void) => tracker.subscribe(listener), [tracker]);
+  return useSyncExternalStore(subscribe, () => tracker.getSnapshot().tracking);
+}
+
 export function useTripSnapshot(tracker: TripTracker): TripSnapshot {
   const subscribe = useCallback((listener: () => void) => tracker.subscribe(listener), [tracker]);
   return useSyncExternalStore(subscribe, tracker.getSnapshot);

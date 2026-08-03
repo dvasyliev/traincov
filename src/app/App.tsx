@@ -4,12 +4,17 @@ import { Trip } from '../screens/Trip';
 import { Log } from '../screens/Log';
 import { TabBar } from './TabBar';
 import { Toast } from '../components/Toast';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { AppStateProvider } from './AppStateProvider';
 import { useAppActions, useAppState } from './app-state';
+import { applyAppUpdate, useAppUpdate } from './useAppUpdate';
+import { useTripSession } from './useTripSession';
 
 function Shell() {
   const { screen, currentTrip, toast } = useAppState();
   const { setScreen, dismissToast } = useAppActions();
+  const { needRefresh } = useAppUpdate();
+  const session = useTripSession();
 
   // Trip без обраного рейсу показувати нічого — повертаємо на Home.
   useEffect(() => {
@@ -23,6 +28,8 @@ function Shell() {
         {screen === 'trip' && <Trip />}
         {screen === 'log' && <Log />}
       </main>
+      {/* Поїздка триває — з оновленням чекаємо: перезавантаження зараз коштує дорожче. */}
+      {needRefresh && !session && <UpdateBanner onApply={applyAppUpdate} />}
       {toast && <Toast message={toast} onDismiss={dismissToast} />}
       <TabBar active={screen} onChange={setScreen} disabled={currentTrip ? [] : ['trip']} />
     </div>

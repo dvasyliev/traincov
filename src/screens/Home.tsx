@@ -3,36 +3,51 @@ import { useAppActions, useAppState } from '../app/app-state';
 import { OperatorPicker } from '../components/OperatorPicker';
 import { TripCard } from '../components/TripCard';
 import { formatKm, formatTime } from '../core/format';
+import { hasScheduleUpdate, homeTrips } from '../core/offline';
 import { groupByDirection, matchesQuery, sortByDeparture } from '../core/trip-search';
 import { useTripIndex } from '../data/trip-index';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useTripSession } from '../app/useTripSession';
 import type { TripIndexEntry } from '../core/types';
 
 export function Home() {
-  const { operator, currentTrip, savedTripIds, loadingTripId, hydrated } = useAppState();
+  const { operator, currentTrip, savedTrips, loadingTripId, hydrated } = useAppState();
   const { setOperator, selectTrip, openCurrentTrip } = useAppActions();
   const indexState = useTripIndex();
   const online = useOnlineStatus();
+  const session = useTripSession();
   const [query, setQuery] = useState('');
 
   const index = indexState.status === 'ready' ? indexState.index : null;
+  const savedById = useMemo(
+    () => new Map(savedTrips.map((trip) => [trip.tripId, trip])),
+    [savedTrips],
+  );
 
+  // Офлайн список звужується до збережених пакетів: решту зараз не завантажити,
+  // і показувати їх — обіцяти те, чого не буде.
+  const visible = useMemo(
+    () => homeTrips({ index, saved: savedTrips, online }),
+    [index, savedTrips, online],
+  );
   const matches = useMemo(
-    () => (index ? sortByDeparture(index.trips.filter((trip) => matchesQuery(trip, query))) : []),
-    [index, query],
+    () => sortByDeparture(visible.filter((trip) => matchesQuery(trip, query))),
+    [visible, query],
   );
   const groups = useMemo(() => groupByDirection(matches), [matches]);
   const isSearching = query.trim().length > 0;
+  const listReady = index !== null || (!online && savedTrips.length > 0);
 
   const renderCard = (entry: TripIndexEntry) => {
-    const saved = savedTripIds.includes(entry.tripId);
+    const saved = savedById.get(entry.tripId);
     return (
       <TripCard
         key={entry.tripId}
         entry={entry}
-        saved={saved}
+        saved={Boolean(saved)}
         loading={loadingTripId === entry.tripId}
         unavailable={!online && !saved}
+        outdated={hasScheduleUpdate(saved, index)}
         current={currentTrip?.tripId === entry.tripId}
         onSelect={selectTrip}
       />
@@ -52,7 +67,9 @@ export function Home() {
 
       {hydrated && currentTrip && (
         <section className="card card--resume">
-          <div className="card__label">Продовжити</div>
+          <div className="card__label">
+            {session?.tripId === currentTrip.tripId ? 'Поїздка перервалась' : 'Продовжити'}
+          </div>
           <div className="card__value">{currentTrip.name}</div>
           <div className="card__meta">
             {formatTime(currentTrip.stops[0]?.dep ?? null)} · {formatKm(currentTrip.lengthKm)} ·{' '}
@@ -78,7 +95,7 @@ export function Home() {
           aria-label="Пошук рейсу"
         />
 
-        {indexState.status === 'loading' && (
+        {indexState.status === 'loading' && !listReady && (
           <div className="skeleton-list" aria-hidden="true">
             <div className="skeleton" />
             <div className="skeleton" />
@@ -86,18 +103,25 @@ export function Home() {
           </div>
         )}
 
-        {indexState.status === 'error' && (
+        {/* Офлайн без індексу — не помилка: збережені пакети самі себе описують. */}
+        {indexState.status === 'error' && online && (
           <div className="banner banner--error">
             Немає списку рейсів: {indexState.message}. Згенеруй бандли — <code>npm run pipeline</code>
             .
           </div>
         )}
 
-        {index && matches.length === 0 && (
+        {!online && savedTrips.length === 0 && (
+          <p className="hint">
+            Збережених пакетів немає. Список рейсів з’явиться, коли буде з’єднання.
+          </p>
+        )}
+
+        {listReady && matches.length === 0 && (isSearching || online) && (
           <p className="hint">Нічого не знайдено. Спробуй назву станції або номер потяга.</p>
         )}
 
-        {index &&
+        {listReady &&
           matches.length > 0 &&
           (isSearching
             ? <div className="trip-list">{matches.map(renderCard)}</div>

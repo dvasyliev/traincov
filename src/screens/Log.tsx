@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAppActions, useAppState } from '../app/app-state';
 
 export function Log() {
-  const { savedTripIds } = useAppState();
+  const { savedTrips } = useAppState();
   const { clearBundles } = useAppActions();
   const [busy, setBusy] = useState(false);
 
@@ -29,12 +29,12 @@ export function Log() {
 
       <section className="card card--spaced">
         <div className="card__label">Збережені пакети</div>
-        <div className="card__value">{savedTripIds.length}</div>
+        <div className="card__value">{savedTrips.length}</div>
         <div className="card__meta">Маршрутні бандли в IndexedDB — доступні офлайн.</div>
         <button
           className="button button--danger"
           onClick={onClear}
-          disabled={busy || savedTripIds.length === 0}
+          disabled={busy || savedTrips.length === 0}
         >
           {busy ? 'Видалення…' : 'Очистити всі'}
         </button>

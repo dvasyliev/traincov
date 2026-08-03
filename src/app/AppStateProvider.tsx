@@ -5,7 +5,7 @@ import {
   clearStoredBundles,
   getSetting,
   getStoredBundle,
-  listStoredTripIds,
+  listSavedTrips,
   pruneStoredBundles,
   setSetting,
   storeBundle,
@@ -38,7 +38,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const [operator, lastTripId, saved] = await Promise.all([
           getSetting('operator'),
           getSetting('lastTripId'),
-          listStoredTripIds(),
+          listSavedTrips(),
         ]);
         const trip =
           typeof lastTripId === 'string' ? ((await getStoredBundle(lastTripId)) ?? null) : null;
@@ -74,19 +74,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const setScreen = useCallback((screen: Screen) => dispatch({ type: 'screen', screen }), []);
 
-  const selectTrip = useCallback(async (entry: TripIndexEntry) => {
+  const selectTrip = useCallback(async (entry: TripIndexEntry, options?: { force?: boolean }) => {
     dispatch({ type: 'select-start', tripId: entry.tripId });
     try {
       // Спершу Dexie: повторний вибір рейсу має працювати в airplane mode.
       // Але лише якщо копія тієї ж версії, що й поточний index.json.
       const dataVersion = cachedDataVersion();
-      let bundle = await getStoredBundle(entry.tripId, dataVersion).catch(() => undefined);
+      let bundle = options?.force
+        ? undefined
+        : await getStoredBundle(entry.tripId, dataVersion).catch(() => undefined);
       if (!bundle) {
         bundle = await loadRouteBundle(entry.file);
-        await storeBundle(bundle, dataVersion).catch(() => {});
+        // QuotaExceededError на iOS: пакет уже в пам'яті, поїздка поїде,
+        // офлайну для нього просто не буде — і про це скаже відсутній бейдж.
+        await storeBundle(bundle, dataVersion, entry).catch(() => {});
       }
       await setSetting('lastTripId', entry.tripId).catch(() => {});
-      dispatch({ type: 'select-done', bundle, screen: 'trip' });
+      const saved = await listSavedTrips().catch(() => []);
+      dispatch({ type: 'select-done', bundle, screen: 'trip', saved });
     } catch (err) {
       const message = navigator.onLine
         ? `Не вдалося завантажити пакет: ${err instanceof Error ? err.message : String(err)}`

@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
-import type { RouteBundle } from './types';
+import { entryFromBundle, type SavedTrip } from './offline';
+import type { RouteBundle, TripIndexEntry } from './types';
 
 /**
  * Версія формату `RouteBundle`. Піднімати щоразу, коли пайплайн починає класти
@@ -34,10 +35,16 @@ export interface Setting {
 class TrainCovDB extends Dexie {
   bundles!: Table<StoredBundle, string>;
   settings!: Table<Setting, string>;
+  /**
+   * Легкі картки збережених рейсів. Окрема таблиця, бо офлайн-Home має
+   * намалювати список, не піднімаючи в пам'ять десятки бандлів по сотні КБ.
+   */
+  savedTrips!: Table<SavedTrip, string>;
 
   constructor() {
     super('traincov');
     this.version(1).stores({ bundles: 'tripId', settings: 'key' });
+    this.version(2).stores({ bundles: 'tripId', settings: 'key', savedTrips: 'tripId' });
   }
 }
 
@@ -79,13 +86,21 @@ export async function getStoredBundle(
 export async function storeBundle(
   bundle: RouteBundle,
   dataVersion: string | null,
+  entry?: TripIndexEntry,
 ): Promise<void> {
+  const savedAt = Date.now();
   await db.bundles.put({
     tripId: bundle.tripId,
-    savedAt: Date.now(),
+    savedAt,
     schemaVersion: BUNDLE_SCHEMA_VERSION,
     dataVersion,
     bundle,
+  });
+  await db.savedTrips.put({
+    tripId: bundle.tripId,
+    entry: entry ?? entryFromBundle(bundle),
+    dataVersion,
+    savedAt,
   });
 }
 
@@ -97,16 +112,49 @@ export async function pruneStoredBundles(): Promise<number> {
   const stale = await db.bundles
     .filter((entry) => entry.schemaVersion !== BUNDLE_SCHEMA_VERSION)
     .primaryKeys();
-  if (stale.length) await db.bundles.bulkDelete(stale);
+  if (stale.length) {
+    await db.bundles.bulkDelete(stale);
+    await db.savedTrips.bulkDelete(stale);
+  }
   return stale.length;
 }
 
-export async function listStoredTripIds(): Promise<string[]> {
-  return (await db.bundles.toCollection().primaryKeys()) as string[];
+/**
+ * Картки збережених рейсів, найновіші зверху.
+ *
+ * Дорогою добудовує рядки для бандлів, збережених до появи цієї таблиці:
+ * інакше після оновлення апки офлайн-список був би порожній рівно в тих,
+ * хто вже підготувався до поїздки.
+ */
+export async function listSavedTrips(): Promise<SavedTrip[]> {
+  const [rows, bundleIds] = await Promise.all([
+    db.savedTrips.toArray(),
+    db.bundles.toCollection().primaryKeys() as Promise<string[]>,
+  ]);
+  const ids = new Set(bundleIds);
+  const known = new Set(rows.map((row) => row.tripId));
+
+  for (const tripId of bundleIds) {
+    if (known.has(tripId)) continue;
+    const stored = await db.bundles.get(tripId);
+    if (!stored) continue;
+    const row: SavedTrip = {
+      tripId,
+      entry: entryFromBundle(stored.bundle),
+      dataVersion: stored.dataVersion,
+      savedAt: stored.savedAt,
+    };
+    rows.push(row);
+    await db.savedTrips.put(row).catch(() => {});
+  }
+
+  // Рядок без бандла — обіцянка офлайну, якої нема чим виконати.
+  return rows.filter((row) => ids.has(row.tripId)).sort((a, b) => b.savedAt - a.savedAt);
 }
 
 /** Кнопка «очистити збережені пакети» на екрані логера — потрібна для дебагу. */
 export async function clearStoredBundles(): Promise<void> {
   await db.bundles.clear();
+  await db.savedTrips.clear();
   await db.settings.delete('lastTripId');
 }

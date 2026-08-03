@@ -423,6 +423,97 @@ button {
   color: var(--text-dim);
 }
 
+/* ---- офлайн і оновлення (задача 07) ---- */
+
+.update-banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom) + 72px);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #1b2740;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.update-banner__text {
+  flex: 1;
+}
+
+.update-banner__button {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.banner--action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.banner__buttons {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.button--inline {
+  margin-top: 0;
+  width: auto;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.button--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.trip-card-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.trip-card__update {
+  align-self: stretch;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border: 1px solid #7a5b1f;
+  border-radius: 10px;
+  background: #241d0e;
+  color: #f0cf8a;
+  font-size: 12px;
+  text-align: left;
+}
+
+.map-note {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(11, 17, 32, 0.85);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 /* ---- trip / map ---- */
 
 .trip-header {

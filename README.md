@@ -2,14 +2,15 @@
 
 PWA, що для обраного залізничного рейсу в Польщі показує, **де і коли зникне мобільний інтернет**.
 
-План MVP — [docs/00-PLAN.md](docs/00-PLAN.md). Поточний стан: **задача 06** (прогноз: countdown
-до наступної діри, часові мітки на всій стрічці, dead reckoning у тунелі).
+План MVP — [docs/00-PLAN.md](docs/00-PLAN.md). Поточний стан: **задача 07** (офлайн: service
+worker, встановлюваний PWA, Wake Lock, карта без мережі у fallback-режимі).
 
 ## Запуск
 
 ```bash
 npm install
 npm run pipeline       # GTFS → public/data/ (потрібен один раз перед dev)
+npm run icons          # перегенерувати іконки PWA (тільки якщо міняєш малюнок)
 npm run dev            # http://localhost:5173  (і по LAN — host увімкнено)
 npm run dev:https      # те саме, але HTTPS (self-signed) — для тестів на телефоні
 npm run build          # tsc -b && vite build
@@ -18,6 +19,10 @@ npm test               # vitest: eta.ts, стрічка, прогон симул
 npm run typecheck
 npm run lint
 ```
+
+**Service worker працює тільки в прод-збірці** (`npm run build && npm run preview`) — у dev він
+вимкнений свідомо (`devOptions.enabled: false`), інакше кеш поверх HMR перетворює дебаг на
+полювання за привидами. Тому офлайн перевіряти на `:4173`, а не на `:5173`.
 
 ## Тест на телефоні
 
@@ -82,6 +87,7 @@ public/data/
 ## Структура
 
 ```
+scripts/icons/     генератор іконок PWA (свій PNG-енкодер, без зовнішніх тулз)
 scripts/pipeline/  офлайн-пайплайн GTFS → бандли (Node + tsx, у браузері не працює)
   download.ts        кеш zip у .cache/ з TTL 24 год
   gtfs.ts            стрімовий CSV із zip (stop_times 40 МБ, shapes 76 МБ)
@@ -96,19 +102,21 @@ scripts/pipeline/  офлайн-пайплайн GTFS → бандли (Node + t
   index.ts           оркестрація
 src/
   app/          таби (без react-router) + AppState: reducer, контекст, гідратація з Dexie
-                useTrip.ts — місток трекер ↔ React
+                useTrip.ts — місток трекер ↔ React; useTripSession.ts (поїздка ↔ sessionStorage),
+                useAppUpdate.ts (банер нової версії)
   screens/      Home.tsx (вибір рейсу), Trip.tsx (стрічка + карта), Log.tsx
   components/   Map.tsx — єдине місце роботи з MapLibre; EtaHeader (countdown до діри),
-                RouteRibbon, TripStatusBar, TripCard, OperatorPicker, Toast,
+                RouteRibbon, TripStatusBar, TripCard, OperatorPicker, Toast, UpdateBanner,
                 ZoneSheet (деталі мертвої зони)
   core/         чиста логіка без React:
                 types.ts, db.ts (Dexie), operators.ts, format.ts, trip-search.ts,
                 zones.ts (підписи й кольори зон, GeoJSON для карти),
                 linref.ts (GPS → км), speed.ts (EMA), geo-source.ts (watchPosition),
                 simulator.ts (?sim=1), trip-tracker.ts (стан поїздки як зовнішній стор),
-                eta.ts (прогноз), eta-status.ts (стан хедера), eta-store.ts, alerts.ts
+                eta.ts (прогноз), eta-status.ts (стан хедера), eta-store.ts, alerts.ts,
+                offline.ts (правила офлайну), wakelock.ts, trip-session.ts
   data/         trip-index.ts (index.json + кеш), route-bundle.ts, http.ts
-  hooks/        useOnlineStatus — банер «офлайн» на Home; useThrottledValue
+  hooks/        useOnlineStatus — банер «офлайн» на Home; useWakeLock; useThrottledValue
   styles/       global.css — тёмна тема, safe-area, 100dvh
 ```
 
@@ -208,10 +216,50 @@ UI: на стрічці — смуга по колії (червона штри�
 Тумблер 🔔 у хедері (зберігається в `settings.etaAlerts`); AudioContext «будиться» саме на тапі —
 iOS не дає створити його поза жестом. Web Notifications свідомо поза MVP.
 
+### Офлайн і PWA (задача 07)
+
+Апка потрібна саме там, де мережі немає, тож офлайн — не режим, а норма.
+
+**Service worker** — `vite-plugin-pwa` (Workbox, `generateSW`). У прекеші app shell:
+HTML, JS, CSS, іконки, воркер MapLibre. Рантайм-кеш: `data/index.json` —
+StaleWhileRevalidate, `data/routes/*.json` — CacheFirst (30 записів). Але **джерело істини
+для даних — Dexie**, а не SW-кеш: UI читає бандли лише з IndexedDB, SW тримає оболонку.
+
+**Оновлення — `registerType: 'prompt'`, не `autoUpdate`.** `autoUpdate` перезавантажив би
+вкладку посеред дороги. Замість цього банер «Є нова версія», і показується він тільки коли
+поїздка не йде ([src/app/useAppUpdate.ts](src/app/useAppUpdate.ts) + прапорець у
+`sessionStorage`).
+
+**Карта офлайн — fallback-режим.** Коридорні PMTiles відкладено (рішення й причини —
+[docs/07-offline-pwa.md](docs/07-offline-pwa.md)). Онлайн — растровий OSM; щойно
+`navigator.onLine` стає `false`, стиль міняється на порожній: маршрут, зони й маркер «я» на
+темному фоні, бейдж «офлайн · без базової карти». Растровий стиль офлайн дав би сотні
+провалених запитів і сіру шахівницю.
+
+**Wake Lock** ([src/core/wakelock.ts](src/core/wakelock.ts)) вмикається на старті поїздки й
+знімається на стопі. Систему, що знімає лок при згортанні, ловимо через `visibilitychange` і
+захоплюємо знову. Немає API (Safari < 16.4, WebView) → банер «вимкніть автоблокування вручну»,
+а не мовчазна бездіяльність.
+
+**Kill PWA на iOS.** Повернення в застосунок після kill виглядає як холодний старт: Dexie
+пам'ятає рейс, але не те, що поїздка ЙШЛА. Тому активна поїздка дублюється в `sessionStorage`
+([src/core/trip-session.ts](src/core/trip-session.ts)) — Home каже «Поїздка перервалась»,
+Trip пропонує «Продовжити відстеження?».
+
+**Home офлайн** показує лише збережені пакети: решту рейсів зараз не завантажити, і місце в
+списку їм ні до чого. Якщо `index.json` недоступний узагалі — картки малюються з даних самого
+бандла ([src/core/offline.ts](src/core/offline.ts)).
+
+**Оновлення розкладу** (7.5): `generatedAt` з index.json свіжіший за збережений — на картці
+з'являється «🔄 є оновлення розкладу — перекачати». Тільки кнопка, ніякої автомагії.
+
+Чого немає і не буде у веб-версії: фонової роботи при погашеному екрані.
+
 ### Стан і збереження
 
-- IndexedDB (Dexie, база `traincov`): `bundles` — завантажені маршрути, `settings` — `operator`
-  і `lastTripId`. Обраний рейс і оператор відновлюються при старті.
+- IndexedDB (Dexie, база `traincov`): `bundles` — завантажені маршрути, `savedTrips` — легкі
+  картки цих маршрутів (щоб офлайн-список не піднімав у пам'ять десятки бандлів),
+  `settings` — `operator` і `lastTripId`. Обраний рейс і оператор відновлюються при старті.
 - **Версіонування бандлів.** Кожен збережений бандл несе `schemaVersion`
   (`BUNDLE_SCHEMA_VERSION` у [src/core/db.ts](src/core/db.ts), піднімати при зміні формату) і
   `dataVersion` (`generatedAt` з index.json). Протухла копія видаляється при читанні, старий
@@ -224,9 +272,10 @@ iOS не дає створити його поза жестом. Web Notificatio
 
 ## Нотатки
 
-- Карта поки на растрових тайлах OSM. У задачі 07 → PMTiles; міняти треба лише
+- Базова карта — растровий OSM онлайн і порожній стиль офлайн. Перехід на PMTiles міняє лише
   `RASTER_OSM_STYLE` у [src/components/Map.tsx](src/components/Map.tsx).
-- Service Worker / PWA свідомо **не** підключено до задачі 07 — у dev він лише заважає.
+- Іконки PWA малює скрипт [scripts/icons/generate.ts](scripts/icons/generate.ts) — свій
+  кодувальник PNG на `zlib`, щоб збірка не залежала від ImageMagick/sharp на машині.
 - Бандл покриває **весь рейс**, а не відрізок між станціями з `TARGET`: `TARGET` — це
   лише фільтр відбору, тож км 0 = перша станція рейсу.
 - Розклад — на один service date (див. `serviceDate` в `index.json`). Вибір дати поїздки поза MVP.

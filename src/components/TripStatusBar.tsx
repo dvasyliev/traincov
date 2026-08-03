@@ -3,6 +3,7 @@
  * Єдиний компонент, який ререндериться на кожен GPS-фікс — тому й маленький.
  */
 import { useTripSnapshot } from '../app/useTrip';
+import { useWakeLock } from '../hooks/useWakeLock';
 import { formatKm1 } from '../core/format';
 import type { TripStatus, TripTracker } from '../core/trip-tracker';
 
@@ -25,6 +26,8 @@ export function TripStatusBar({ tracker }: { tracker: TripTracker }) {
   const snapshot = useTripSnapshot(tracker);
   const { bundle } = tracker;
   const { km, kmEstimated, speedKmh, status, tracking, confidence, offsetM, simulated } = snapshot;
+  // Екран тримаємо увімкненим рівно поки йде поїздка (задача 07).
+  const wakeLock = useWakeLock(tracking);
 
   const next = km === null ? undefined : bundle.stops.find((stop) => stop.km > km + 0.05);
   const note = tracking ? CONFIDENCE_NOTE[confidence] : undefined;
@@ -56,6 +59,9 @@ export function TripStatusBar({ tracker }: { tracker: TripTracker }) {
         {/* У тунелі км рахується dead reckoning'ом — це має бути видно. */}
         {kmEstimated && <span className="badge badge--muted">км — оцінка</span>}
         {simulated && <span className="badge badge--muted">симулятор</span>}
+        {tracking && wakeLock === 'active' && (
+          <span className="badge badge--saved">екран не гасне</span>
+        )}
         {next && (
           <span className="trip-status__next">
             → {next.name}
@@ -68,6 +74,17 @@ export function TripStatusBar({ tracker }: { tracker: TripTracker }) {
         <div className="banner banner--warn">
           Ви за {offsetM} м від колії. Схоже, це не цей маршрут — км і швидкість зараз не мають
           сенсу.
+        </div>
+      )}
+      {tracking && wakeLock === 'unsupported' && (
+        <div className="banner">
+          Браузер не вміє тримати екран увімкненим. Вимкніть автоблокування вручну на час поїздки
+          (iOS: Налаштування → Екран та яскравість → Автоблокування → Ніколи).
+        </div>
+      )}
+      {tracking && wakeLock === 'failed' && (
+        <div className="banner banner--warn">
+          Не вдалося втримати екран увімкненим — перевірте режим енергозбереження.
         </div>
       )}
       {status === 'denied' && (
