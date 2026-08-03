@@ -46,9 +46,15 @@ export function parseSimOptions(search: string): SimOptions | null {
   };
 }
 
+/** Скільки має бути в зоні, щоб на ній встиг спрацювати таймаут «немає GPS». */
+const MIN_SIM_HOLE_KM = 1;
+
 /** Ділянка, на якій симулятор перестає віддавати фікси (перевірка стану «немає GPS»). */
 export function simulatedGpsHole(bundle: RouteBundle): { fromKm: number; toKm: number } {
-  const zone = bundle.deadZones[0];
+  // Тунель на 40 м симулятор проскочить непомітно — беремо першу відчутну зону.
+  const zone =
+    bundle.deadZones.find((z) => z.severity === 'none' && z.lengthKm >= MIN_SIM_HOLE_KM) ??
+    bundle.deadZones[0];
   if (zone) return { fromKm: zone.fromKm, toKm: zone.toKm };
   const from = bundle.lengthKm * FALLBACK_HOLE_AT;
   return { fromKm: from, toKm: Math.min(from + FALLBACK_HOLE_KM, bundle.lengthKm) };

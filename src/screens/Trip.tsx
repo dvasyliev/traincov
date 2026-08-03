@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Map } from '../components/Map';
 import { RouteRibbon } from '../components/RouteRibbon';
 import { TripStatusBar } from '../components/TripStatusBar';
+import { ZoneSheet } from '../components/ZoneSheet';
 import { useAppActions, useAppState } from '../app/app-state';
 import { useTripTracker } from '../app/useTrip';
 import { formatKm, formatTime } from '../core/format';
 import { operatorLabel } from '../core/operators';
 import type { OperatorId } from '../core/operators';
-import type { RouteBundle } from '../core/types';
+import type { DeadZone, RouteBundle } from '../core/types';
 
 type View = 'ribbon' | 'map';
 
@@ -25,8 +26,11 @@ function TripView({ bundle, operator }: { bundle: RouteBundle; operator: Operato
   const { setScreen } = useAppActions();
   const tracker = useTripTracker(bundle);
   const [view, setView] = useState<View>('ribbon');
+  /** Один шит на екран: його відкривають і стрічка, і карта. */
+  const [zone, setZone] = useState<DeadZone | null>(null);
 
   const last = bundle.stops[bundle.stops.length - 1];
+  const zonesCount = bundle.deadZones.length;
 
   return (
     <div className="screen screen--full">
@@ -39,7 +43,8 @@ function TripView({ bundle, operator }: { bundle: RouteBundle; operator: Operato
       </header>
       <div className="trip-subheader">
         {formatTime(bundle.stops[0]?.dep ?? null)} → {formatTime(last?.arr ?? null)} ·{' '}
-        {formatKm(bundle.lengthKm)} · {bundle.stops.length} зупинок
+        {formatKm(bundle.lengthKm)} · {bundle.stops.length} зупинок ·{' '}
+        {zonesCount ? `${zonesCount} мертвих зон` : 'зон не знайдено'}
       </div>
 
       <TripStatusBar tracker={tracker} />
@@ -62,10 +67,18 @@ function TripView({ bundle, operator }: { bundle: RouteBundle; operator: Operato
       </div>
 
       {view === 'ribbon' ? (
-        <RouteRibbon tracker={tracker} />
+        <RouteRibbon tracker={tracker} onZoneSelect={setZone} />
       ) : (
-        <Map route={bundle.shape} stops={bundle.stops} tracker={tracker} />
+        <Map
+          route={bundle.shape}
+          stops={bundle.stops}
+          zones={bundle.deadZones}
+          onZoneSelect={setZone}
+          tracker={tracker}
+        />
       )}
+
+      <ZoneSheet zone={zone} onClose={() => setZone(null)} />
     </div>
   );
 }

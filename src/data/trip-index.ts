@@ -6,6 +6,14 @@ import { fetchData } from './http';
 let cached: TripIndex | null = null;
 let inflight: Promise<TripIndex> | null = null;
 
+/**
+ * Версія даних із уже завантаженого index.json, синхронно і без мережі.
+ * `null` — індексу ще немає (офлайн-старт): звіряти збережений бандл нема з чим.
+ */
+export function cachedDataVersion(): string | null {
+  return cached?.generatedAt ?? null;
+}
+
 export function loadTripIndex(): Promise<TripIndex> {
   if (cached) return Promise.resolve(cached);
   inflight ??= fetchData<TripIndex>('index.json')

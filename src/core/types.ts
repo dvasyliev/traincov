@@ -36,10 +36,17 @@ export interface DeadZone {
   id: string;
   fromKm: number;
   toKm: number;
+  /** `toKm - fromKm`; порахований пайплайном, щоб UI не рахував його на кожен кадр. */
+  lengthKm: number;
   kind: DeadZoneKind;
   severity: DeadZoneSeverity;
   source: DeadZoneSource;
   note?: string;
+  /**
+   * Готовий шматок колії (`lineSliceAlong(shape, fromKm, toKm)`).
+   * Ріже пайплайн: клієнт у дорозі має тільки малювати, а не рахувати геометрію.
+   */
+  geometry: GeoJSON.LineString;
 }
 
 /** Повний офлайн-пакет одного рейсу: `public/data/routes/{tripId}.json`. */
@@ -60,7 +67,7 @@ export interface RouteBundle {
   lengthKm: number;
   stops: RouteStop[];
   speedProfile: SpeedSegment[];
-  /** Порожній до задачі 05. */
+  /** Відсортовані за `fromKm`, не перетинаються. */
   deadZones: DeadZone[];
 }
 
@@ -77,6 +84,8 @@ export interface TripIndexEntry {
   toStop: string;
   lengthKm: number;
   stopCount: number;
+  /** Скільки мертвих зон у бандлі — видно ще до завантаження пакета. */
+  zonesCount: number;
   /** Шлях відносно `public/data/`. */
   file: string;
   sizeKb: number;

@@ -8,8 +8,9 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTripUpdates } from '../app/useTrip';
 import { formatKm1, formatTime } from '../core/format';
+import { zoneSummary } from '../core/zones';
 import type { TripSnapshot, TripTracker } from '../core/trip-tracker';
-import type { RouteStop } from '../core/types';
+import type { DeadZone, RouteStop } from '../core/types';
 
 /** Масштаб осі. 3.5 px/км: 400-кілометровий рейс — це ~1400 px, огляд на 2–3 екрани. */
 const PX_PER_KM = 3.5;
@@ -17,10 +18,19 @@ const PX_PER_KM = 3.5;
 const MARKER_RATIO = 0.35;
 /** Ближчі за це підписи станцій злипаються — лишаємо тільки крапку. */
 const MIN_LABEL_GAP_PX = 18;
+/** Тунель на 40 м — це 0.14 px. Смужку все одно треба бачити. */
+const MIN_ZONE_PX = 4;
 
 interface RibbonStop {
   stop: RouteStop;
   top: number;
+  showLabel: boolean;
+}
+
+interface RibbonZone {
+  zone: DeadZone;
+  top: number;
+  height: number;
   showLabel: boolean;
 }
 
@@ -36,7 +46,29 @@ function layout(stops: RouteStop[]): RibbonStop[] {
   });
 }
 
-export function RouteRibbon({ tracker }: { tracker: TripTracker }) {
+/**
+ * Смужки зон. Підписи проріджуємо так само, як у станцій: у Варшаві
+ * чотири зони лягають на 20 px, і без цього там каша з чипів.
+ */
+function layoutZones(zones: DeadZone[]): RibbonZone[] {
+  let lastLabelTop = -Infinity;
+  return zones.map((zone) => {
+    const top = zone.fromKm * PX_PER_KM;
+    const height = Math.max(zone.lengthKm * PX_PER_KM, MIN_ZONE_PX);
+    const center = top + height / 2;
+    const showLabel = center - lastLabelTop >= MIN_LABEL_GAP_PX;
+    if (showLabel) lastLabelTop = center;
+    return { zone, top, height, showLabel };
+  });
+}
+
+export interface RouteRibbonProps {
+  tracker: TripTracker;
+  /** Тап по зоні → bottom-sheet; його тримає екран поїздки. */
+  onZoneSelect?: (zone: DeadZone) => void;
+}
+
+export function RouteRibbon({ tracker, onZoneSelect }: RouteRibbonProps) {
   const { bundle } = tracker;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const meRef = useRef<HTMLDivElement | null>(null);
@@ -45,6 +77,7 @@ export function RouteRibbon({ tracker }: { tracker: TripTracker }) {
   const [viewportH, setViewportH] = useState(0);
 
   const stops = useMemo(() => layout(bundle.stops), [bundle.stops]);
+  const zones = useMemo(() => layoutZones(bundle.deadZones), [bundle.deadZones]);
   const trackH = bundle.lengthKm * PX_PER_KM;
 
   const apply = useCallback((snapshot: TripSnapshot) => {
@@ -87,6 +120,19 @@ export function RouteRibbon({ tracker }: { tracker: TripTracker }) {
         <div style={{ height: viewportH * MARKER_RATIO }} />
         <div className="ribbon__track" style={{ height: trackH }}>
           <div className="ribbon__rail" />
+          {zones.map(({ zone, top, height, showLabel }) => (
+            <button
+              type="button"
+              key={zone.id}
+              className={`ribbon__zone ribbon__zone--${zone.severity}`}
+              style={{ top, height }}
+              aria-label={`${zoneSummary(zone)}, ${zone.fromKm}–${zone.toKm} км`}
+              onClick={() => onZoneSelect?.(zone)}
+            >
+              <span className="ribbon__zone-hit" />
+              {showLabel && <span className="ribbon__zone-label">{zoneSummary(zone)}</span>}
+            </button>
+          ))}
           <div className="ribbon__done" ref={doneRef} />
           {stops.map(({ stop, top, showLabel }) => (
             <div className="ribbon__stop" key={stop.id + stop.km} style={{ top }}>

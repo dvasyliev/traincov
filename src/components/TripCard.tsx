@@ -38,7 +38,8 @@ export function TripCard({ entry, saved, loading, unavailable, current, onSelect
         {entry.fromStop} → {entry.toStop}
       </div>
       <div className="trip-card__meta">
-        {formatKm(entry.lengthKm)} · {entry.stopCount} зупинок · {entry.sizeKb} КБ
+        {formatKm(entry.lengthKm)} · {entry.stopCount} зупинок · {entry.zonesCount ?? 0} зон ·{' '}
+        {entry.sizeKb} КБ
         {saved && <span className="badge badge--saved">збережено</span>}
         {loading && <span className="badge">завантаження…</span>}
         {unavailable && !loading && <span className="badge badge--muted">офлайн</span>}

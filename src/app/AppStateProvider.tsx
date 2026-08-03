@@ -6,10 +6,12 @@ import {
   getSetting,
   getStoredBundle,
   listStoredTripIds,
+  pruneStoredBundles,
   setSetting,
   storeBundle,
 } from '../core/db';
 import { loadRouteBundle } from '../data/route-bundle';
+import { cachedDataVersion } from '../data/trip-index';
 import type { Screen } from './screens';
 import {
   AppActionsContext,
@@ -31,6 +33,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
+        // Спершу прибрати бандли старого формату, потім читати список збережених.
+        await pruneStoredBundles().catch(() => 0);
         const [operator, lastTripId, saved] = await Promise.all([
           getSetting('operator'),
           getSetting('lastTripId'),
@@ -74,10 +78,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'select-start', tripId: entry.tripId });
     try {
       // Спершу Dexie: повторний вибір рейсу має працювати в airplane mode.
-      let bundle = await getStoredBundle(entry.tripId).catch(() => undefined);
+      // Але лише якщо копія тієї ж версії, що й поточний index.json.
+      const dataVersion = cachedDataVersion();
+      let bundle = await getStoredBundle(entry.tripId, dataVersion).catch(() => undefined);
       if (!bundle) {
         bundle = await loadRouteBundle(entry.file);
-        await storeBundle(bundle).catch(() => {});
+        await storeBundle(bundle, dataVersion).catch(() => {});
       }
       await setSetting('lastTripId', entry.tripId).catch(() => {});
       dispatch({ type: 'select-done', bundle, screen: 'trip' });

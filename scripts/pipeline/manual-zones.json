@@ -1,0 +1,33 @@
+{
+  "note": "Ручні мертві зони — власні спостереження в дорозі. УВАГА: fromKm/toKm тут — км КОНКРЕТНОГО бандла (від першої станції рейсу за геометрією shape), а не кілометраж лінії PLK. Тому match обов'язково має фіксувати напрямок: масив tripNameContains, де мають збігтися ВСІ підрядки. Стабільний км лінії PLK — покращення поза MVP. Стартові записи нижче — сід-дані з приблизною прив'язкою: перевірити й уточнити в наступній поїздці.",
+  "rules": [
+    {
+      "match": { "tripNameContains": ["Wrocław Główny →", "Warszawa"] },
+      "zones": [
+        {
+          "fromKm": 145.0,
+          "toKm": 152.5,
+          "severity": "none",
+          "note": "Ліси за Lubliniec у бік Częstochowa — сід-дані, потребує перевірки"
+        },
+        {
+          "fromKm": 231.0,
+          "toKm": 237.0,
+          "severity": "weak",
+          "note": "Перегін Radomsko → Piotrków Tryb., сигнал провалюється — сід-дані, потребує перевірки"
+        }
+      ]
+    },
+    {
+      "match": { "tripNameContains": ["Warszawa", "→ Wrocław Główny"] },
+      "zones": [
+        {
+          "fromKm": 292.0,
+          "toKm": 299.5,
+          "severity": "none",
+          "note": "Ліс за Ostrów Wielkopolski у бік Twardogóra — сід-дані, потребує перевірки"
+        }
+      ]
+    }
+  ]
+}

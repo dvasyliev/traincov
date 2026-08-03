@@ -27,6 +27,11 @@ import {
   streamCsv,
   todayYyyymmdd,
 } from './gtfs.ts';
+import { loadManualRules } from './manual-zones.ts';
+import { overpassNetworkCalls } from './overpass.ts';
+import { createShapeIndex } from './shape-index.ts';
+import { buildDeadZones } from './zones.ts';
+import { collectOsmZones } from './zones-osm.ts';
 
 const log = (msg: string) => console.log(`[pipeline] ${msg}`);
 const warn = (msg: string) => console.warn(`[pipeline] ⚠ ${msg}`);
@@ -50,7 +55,11 @@ function pickServiceDate(activeByDate: Map<string, Set<string>>): string {
 
 async function main(): Promise<void> {
   const started = Date.now();
+  /** `--no-osm`: працюємо тільки на кеші Overpass (офлайн-прогін, CI без мережі). */
+  const noOsm = process.argv.includes('--no-osm');
   const zip = await ensureGtfs(process.argv.includes('--force-download'));
+  const manualRules = await loadManualRules();
+  log(`ручних правил зон: ${manualRules.length}${noOsm ? ' · OSM тільки з кеша (--no-osm)' : ''}`);
 
   // --- довідники (усі маленькі, тримаємо цілком) ---
   const [agencyRows, routeRows, stopRows, calendarRows] = await Promise.all([
@@ -223,6 +232,7 @@ async function main(): Promise<void> {
 
   const entries: TripIndexEntry[] = [];
   let dropped = 0;
+  let totalZones = 0;
   for (const trip of selected.values()) {
     const times = stopTimes.get(trip.tripId);
     const shapePoints = shapes.get(trip.shapeId);
@@ -250,6 +260,26 @@ async function main(): Promise<void> {
     for (const w of result.warnings) warn(`${trip.tripId}: ${w}`);
 
     const { bundle } = result;
+
+    // --- задача 05: мертві зони (OSM + ручний файл) ---
+    const shapeIndex = createShapeIndex(bundle.shape);
+    const osm = await collectOsmZones({
+      shape: bundle.shape,
+      index: shapeIndex,
+      label: bundle.name,
+      offline: noOsm,
+    });
+    const zones = buildDeadZones({
+      trip: { tripId: bundle.tripId, name: bundle.name, carrier: bundle.carrier },
+      shape: bundle.shape,
+      lengthKm: bundle.lengthKm,
+      osm,
+      manualRules,
+    });
+    for (const e of zones.errors) warn(`${trip.tripId}: зона відкинута — ${e}`);
+    bundle.deadZones = zones.zones;
+    totalZones += zones.zones.length;
+
     const file = `${ROUTES_SUBDIR}/${sanitize(bundle.tripId)}.json`;
     const json = JSON.stringify(bundle);
     await writeFile(path.join(outDir, file), json);
@@ -268,6 +298,7 @@ async function main(): Promise<void> {
       toStop: last.name,
       lengthKm: bundle.lengthKm,
       stopCount: bundle.stops.length,
+      zonesCount: bundle.deadZones.length,
       file,
       sizeKb,
     });
@@ -283,6 +314,11 @@ async function main(): Promise<void> {
   await writeFile(path.join(outDir, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
 
   const maxKb = entries.reduce((m, e) => Math.max(m, e.sizeKb), 0);
+  const noZones = entries.filter((e) => e.zonesCount === 0).length;
+  log(
+    `зони: ${totalZones} усього, ${noZones} рейсів без зон, ` +
+      `запитів до Overpass: ${overpassNetworkCalls()}`,
+  );
   log(
     `готово: ${entries.length} бандлів (відкинуто ${dropped}), максимум ${maxKb} КБ, ` +
       `${((Date.now() - started) / 1000).toFixed(1)} с`,

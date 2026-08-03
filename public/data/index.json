@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-08-03T06:54:18.979Z",
+  "generatedAt": "2026-08-03T12:09:31.375Z",
   "serviceDate": "2026-08-03",
-  "source": "Rozkłady: mkuran.pl / PKP PLK",
+  "source": "Rozkłady: mkuran.pl / PKP PLK · Tunele: OpenStreetMap",
   "trips": [
     {
       "tripId": "PLK_IC_2026_769215910",
@@ -13,8 +13,9 @@
       "toStop": "Warszawa Wschodnia",
       "lengthKm": 407.8,
       "stopCount": 16,
+      "zonesCount": 7,
       "file": "routes/PLK_IC_2026_769215910.json",
-      "sizeKb": 10.3
+      "sizeKb": 12.6
     },
     {
       "tripId": "PLK_IC_2026_261707384",
@@ -26,8 +27,9 @@
       "toStop": "Wrocław Główny",
       "lengthKm": 379.97,
       "stopCount": 19,
+      "zonesCount": 5,
       "file": "routes/PLK_IC_2026_261707384.json",
-      "sizeKb": 13.6
+      "sizeKb": 15.3
     },
     {
       "tripId": "PLK_IC_2026_605667922",
@@ -39,8 +41,9 @@
       "toStop": "Praha hlavní nádraží",
       "lengthKm": 821.69,
       "stopCount": 25,
+      "zonesCount": 17,
       "file": "routes/PLK_IC_2026_605667922.json",
-      "sizeKb": 27.7
+      "sizeKb": 32.2
     },
     {
       "tripId": "PLK_IC_2026_348094928",
@@ -52,8 +55,9 @@
       "toStop": "Berlin Hauptbahnhof",
       "lengthKm": 620.93,
       "stopCount": 14,
+      "zonesCount": 11,
       "file": "routes/PLK_IC_2026_348094928.json",
-      "sizeKb": 17.5
+      "sizeKb": 20.5
     },
     {
       "tripId": "PLK_IC_2026_664457907",
@@ -65,8 +69,9 @@
       "toStop": "Przemyśl Główny",
       "lengthKm": 876.33,
       "stopCount": 41,
+      "zonesCount": 14,
       "file": "routes/PLK_IC_2026_664457907.json",
-      "sizeKb": 24.9
+      "sizeKb": 28.5
     },
     {
       "tripId": "PLK_IC_2026_948219494",
@@ -78,8 +83,9 @@
       "toStop": "Przemyśl Główny",
       "lengthKm": 889.76,
       "stopCount": 28,
+      "zonesCount": 9,
       "file": "routes/PLK_IC_2026_948219494.json",
-      "sizeKb": 26.1
+      "sizeKb": 28.4
     },
     {
       "tripId": "PLK_IC_2026_476460716",
@@ -91,8 +97,9 @@
       "toStop": "Ustka",
       "lengthKm": 757.37,
       "stopCount": 31,
+      "zonesCount": 13,
       "file": "routes/PLK_IC_2026_476460716.json",
-      "sizeKb": 22.6
+      "sizeKb": 25.9
     },
     {
       "tripId": "PLK_IC_2026_399299795",
@@ -104,8 +111,9 @@
       "toStop": "Warszawa Wschodnia",
       "lengthKm": 534.24,
       "stopCount": 21,
+      "zonesCount": 6,
       "file": "routes/PLK_IC_2026_399299795.json",
-      "sizeKb": 17.7
+      "sizeKb": 19.4
     },
     {
       "tripId": "PLK_IC_2026_422284809",
@@ -117,8 +125,9 @@
       "toStop": "Gdynia Główna",
       "lengthKm": 496.36,
       "stopCount": 18,
+      "zonesCount": 11,
       "file": "routes/PLK_IC_2026_422284809.json",
-      "sizeKb": 12.4
+      "sizeKb": 15.2
     },
     {
       "tripId": "PLK_IC_2026_475901371",
@@ -130,8 +139,9 @@
       "toStop": "Wrocław Główny",
       "lengthKm": 407.8,
       "stopCount": 15,
+      "zonesCount": 6,
       "file": "routes/PLK_IC_2026_475901371.json",
-      "sizeKb": 10.2
+      "sizeKb": 12.2
     },
     {
       "tripId": "PLK_IC_2026_123784580",
@@ -143,8 +153,9 @@
       "toStop": "Wien Westbahnhof",
       "lengthKm": 640.33,
       "stopCount": 19,
+      "zonesCount": 17,
       "file": "routes/PLK_IC_2026_123784580.json",
-      "sizeKb": 15.5
+      "sizeKb": 20.2
     },
     {
       "tripId": "PLK_IC_2026_700704083",
@@ -156,8 +167,9 @@
       "toStop": "Przemyśl Główny",
       "lengthKm": 507.5,
       "stopCount": 17,
+      "zonesCount": 6,
       "file": "routes/PLK_IC_2026_700704083.json",
-      "sizeKb": 14.1
+      "sizeKb": 15.6
     },
     {
       "tripId": "PLK_IC_2026_223604030",
@@ -169,8 +181,9 @@
       "toStop": "Warszawa Wschodnia",
       "lengthKm": 469.18,
       "stopCount": 8,
+      "zonesCount": 12,
       "file": "routes/PLK_IC_2026_223604030.json",
-      "sizeKb": 9.9
+      "sizeKb": 13.7
     },
     {
       "tripId": "PLK_IC_2026_327883545",
@@ -182,8 +195,9 @@
       "toStop": "Berlin Hauptbahnhof",
       "lengthKm": 864.86,
       "stopCount": 24,
+      "zonesCount": 14,
       "file": "routes/PLK_IC_2026_327883545.json",
-      "sizeKb": 23.8
+      "sizeKb": 27.5
     },
     {
       "tripId": "PLK_IC_2026_612293280",
@@ -195,8 +209,9 @@
       "toStop": "Białystok",
       "lengthKm": 559.58,
       "stopCount": 28,
+      "zonesCount": 7,
       "file": "routes/PLK_IC_2026_612293280.json",
-      "sizeKb": 16.3
+      "sizeKb": 18.3
     },
     {
       "tripId": "PLK_IC_2026_236228743",
@@ -208,8 +223,9 @@
       "toStop": "Zakopane",
       "lengthKm": 540.3,
       "stopCount": 29,
+      "zonesCount": 10,
       "file": "routes/PLK_IC_2026_236228743.json",
-      "sizeKb": 27.4
+      "sizeKb": 29.9
     },
     {
       "tripId": "PLK_IC_2026_398392732",
@@ -221,8 +237,9 @@
       "toStop": "Wrocław Główny",
       "lengthKm": 469.18,
       "stopCount": 6,
+      "zonesCount": 11,
       "file": "routes/PLK_IC_2026_398392732.json",
-      "sizeKb": 9.6
+      "sizeKb": 13.1
     },
     {
       "tripId": "PLK_IC_2026_769074386",
@@ -234,8 +251,9 @@
       "toStop": "Ustka",
       "lengthKm": 1001.3,
       "stopCount": 44,
+      "zonesCount": 16,
       "file": "routes/PLK_IC_2026_769074386.json",
-      "sizeKb": 29.4
+      "sizeKb": 33.5
     },
     {
       "tripId": "PLK_IC_2026_252898144",
@@ -247,8 +265,9 @@
       "toStop": "Świnoujście",
       "lengthKm": 733.12,
       "stopCount": 24,
+      "zonesCount": 7,
       "file": "routes/PLK_IC_2026_252898144.json",
-      "sizeKb": 24.4
+      "sizeKb": 26.3
     },
     {
       "tripId": "PLK_IC_2026_111611146",
@@ -260,8 +279,9 @@
       "toStop": "Kołobrzeg",
       "lengthKm": 429.49,
       "stopCount": 15,
+      "zonesCount": 8,
       "file": "routes/PLK_IC_2026_111611146.json",
-      "sizeKb": 12.3
+      "sizeKb": 14.3
     },
     {
       "tripId": "PLK_IC_2026_622643047",
@@ -273,8 +293,9 @@
       "toStop": "Wrocław Główny",
       "lengthKm": 379.97,
       "stopCount": 19,
+      "zonesCount": 5,
       "file": "routes/PLK_IC_2026_622643047.json",
-      "sizeKb": 13.7
+      "sizeKb": 15.3
     },
     {
       "tripId": "PLK_IC_2026_102437507",
@@ -286,8 +307,9 @@
       "toStop": "Świnoujście",
       "lengthKm": 488.44,
       "stopCount": 18,
+      "zonesCount": 10,
       "file": "routes/PLK_IC_2026_102437507.json",
-      "sizeKb": 14.1
+      "sizeKb": 16.7
     },
     {
       "tripId": "PLK_IC_2026_861848343",
@@ -299,8 +321,9 @@
       "toStop": "Przemyśl Główny",
       "lengthKm": 508.57,
       "stopCount": 26,
+      "zonesCount": 5,
       "file": "routes/PLK_IC_2026_861848343.json",
-      "sizeKb": 16.2
+      "sizeKb": 17.5
     },
     {
       "tripId": "PLK_IC_2026_353128209",
@@ -312,8 +335,9 @@
       "toStop": "Wrocław Główny",
       "lengthKm": 579.42,
       "stopCount": 29,
+      "zonesCount": 9,
       "file": "routes/PLK_IC_2026_353128209.json",
-      "sizeKb": 16.1
+      "sizeKb": 18.6
     },
     {
       "tripId": "PLK_IC_2026_601777095",
@@ -325,8 +349,9 @@
       "toStop": "Kołobrzeg",
       "lengthKm": 684.75,
       "stopCount": 27,
+      "zonesCount": 13,
       "file": "routes/PLK_IC_2026_601777095.json",
-      "sizeKb": 20.2
+      "sizeKb": 23.5
     },
     {
       "tripId": "PLK_IC_2026_615322540",
@@ -338,8 +363,9 @@
       "toStop": "Warszawa Wschodnia",
       "lengthKm": 407.8,
       "stopCount": 7,
+      "zonesCount": 7,
       "file": "routes/PLK_IC_2026_615322540.json",
-      "sizeKb": 8.9
+      "sizeKb": 11.2
     },
     {
       "tripId": "PLK_PR_2026_226751987",
@@ -351,8 +377,9 @@
       "toStop": "Szklarska Poręba Górna",
       "lengthKm": 322.65,
       "stopCount": 37,
+      "zonesCount": 9,
       "file": "routes/PLK_PR_2026_226751987.json",
-      "sizeKb": 18
+      "sizeKb": 20.2
     },
     {
       "tripId": "PLK_IC_2026_970791067",
@@ -364,8 +391,9 @@
       "toStop": "Białystok",
       "lengthKm": 737.82,
       "stopCount": 30,
+      "zonesCount": 10,
       "file": "routes/PLK_IC_2026_970791067.json",
-      "sizeKb": 22.7
+      "sizeKb": 25.3
     },
     {
       "tripId": "PLK_IC_2026_747708374",
@@ -377,8 +405,9 @@
       "toStop": "Przemyśl Główny",
       "lengthKm": 507.5,
       "stopCount": 18,
+      "zonesCount": 6,
       "file": "routes/PLK_IC_2026_747708374.json",
-      "sizeKb": 14.2
+      "sizeKb": 15.8
     },
     {
       "tripId": "PLK_IC_2026_296065855",
@@ -390,8 +419,9 @@
       "toStop": "Gdynia Główna",
       "lengthKm": 496.36,
       "stopCount": 12,
+      "zonesCount": 11,
       "file": "routes/PLK_IC_2026_296065855.json",
-      "sizeKb": 11.4
+      "sizeKb": 14.2
     },
     {
       "tripId": "PLK_IC_2026_424989529",
@@ -403,8 +433,9 @@
       "toStop": "Białystok",
       "lengthKm": 559.58,
       "stopCount": 28,
+      "zonesCount": 7,
       "file": "routes/PLK_IC_2026_424989529.json",
-      "sizeKb": 16.3
+      "sizeKb": 18.3
     },
     {
       "tripId": "PLK_IC_2026_421606692",
@@ -416,8 +447,9 @@
       "toStop": "Wrocław Główny",
       "lengthKm": 407.8,
       "stopCount": 7,
+      "zonesCount": 6,
       "file": "routes/PLK_IC_2026_421606692.json",
-      "sizeKb": 8.9
+      "sizeKb": 11
     },
     {
       "tripId": "PLK_IC_2026_207548857",
@@ -429,8 +461,9 @@
       "toStop": "Przemyśl Główny",
       "lengthKm": 663.55,
       "stopCount": 33,
+      "zonesCount": 14,
       "file": "routes/PLK_IC_2026_207548857.json",
-      "sizeKb": 18.9
+      "sizeKb": 22.5
     }
   ]
 }

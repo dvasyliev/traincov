@@ -627,6 +627,7 @@ button {
   left: 64px;
   width: 3px;
   border-radius: 2px;
+  z-index: 1;
 }
 
 .ribbon__rail {
@@ -648,6 +649,80 @@ button {
   height: 0;
   display: flex;
   align-items: center;
+  z-index: 1;
+  /* Підписи станцій лежать поверх зон — але тап має діставатися зони. */
+  pointer-events: none;
+}
+
+/* ---- мертві зони на стрічці ---- */
+
+.ribbon__zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  z-index: 0;
+}
+
+/* Смуга по колії: ширша за рейку, тому зона читається як ділянка маршруту. */
+.ribbon__zone::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 58px;
+  width: 15px;
+  border-radius: 4px;
+}
+
+.ribbon__zone--none::before {
+  background: repeating-linear-gradient(
+    -45deg,
+    #ef4444,
+    #ef4444 4px,
+    #7f1d1d 4px,
+    #7f1d1d 8px
+  );
+}
+
+.ribbon__zone--weak::before {
+  background: #f59e0b;
+  opacity: 0.75;
+}
+
+/* Тунель на 40 м — це 0.14 px висоти. Пальцю треба хоч якась мішень. */
+.ribbon__zone-hit {
+  position: absolute;
+  left: 40px;
+  right: 0;
+  top: 50%;
+  height: 28px;
+  transform: translateY(-50%);
+}
+
+.ribbon__zone-label {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.ribbon__zone--none .ribbon__zone-label {
+  border-color: #ef4444;
+}
+
+.ribbon__zone--weak .ribbon__zone-label {
+  border-color: #f59e0b;
 }
 
 .ribbon__dot {
@@ -728,6 +803,102 @@ button {
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---- bottom-sheet зони ---- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(4, 8, 18, 0.6);
+}
+
+.sheet {
+  width: 100%;
+  padding: 8px 20px calc(env(safe-area-inset-bottom) + 20px);
+  border-top: 3px solid var(--border);
+  border-radius: 18px 18px 0 0;
+  background: var(--bg-elevated);
+  animation: sheet-in 160ms ease-out;
+}
+
+.sheet--none {
+  border-top-color: #ef4444;
+}
+
+.sheet--weak {
+  border-top-color: #f59e0b;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}
+
+.sheet__grip {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.sheet__title {
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.sheet__big {
+  margin-top: 2px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet__rows {
+  margin: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheet__row {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.sheet__row dt {
+  flex: none;
+  width: 92px;
+  color: var(--text-dim);
+}
+
+.sheet__row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet__note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-dim);
 }
 
 /* ---- карта ---- */

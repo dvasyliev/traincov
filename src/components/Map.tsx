@@ -5,6 +5,7 @@ import {
   NavigationControl,
   Popup,
   setWorkerUrl,
+  type ExpressionSpecification,
   type LngLatBoundsLike,
   type StyleSpecification,
 } from 'maplibre-gl';
@@ -14,7 +15,8 @@ import {
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { bbox } from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { RouteStop } from '../core/types';
+import { ZONE_COLOR, zoneMarkersToGeoJson, zonesToGeoJson } from '../core/zones';
+import type { DeadZone, RouteStop } from '../core/types';
 import type { TripTracker } from '../core/trip-tracker';
 
 setWorkerUrl(maplibreWorkerUrl);
@@ -22,7 +24,20 @@ setWorkerUrl(maplibreWorkerUrl);
 const ROUTE_SOURCE = 'route';
 const ROUTE_LAYER = 'route-line';
 const ROUTE_COLOR = '#e11d48';
+const ZONE_SOURCE = 'zones';
+const ZONE_LAYER = 'zone-line';
+const ZONE_MARKER_SOURCE = 'zone-markers';
+const ZONE_MARKER_LAYER = 'zone-marker';
 const FIT_PADDING = 40;
+
+/** Колір за severity — один вираз на всі шари зон. */
+const ZONE_COLOR_EXPRESSION: ExpressionSpecification = [
+  'match',
+  ['get', 'severity'],
+  'weak',
+  ZONE_COLOR.weak,
+  ZONE_COLOR.none,
+];
 
 /** Уся Польща — запасний кадр, якщо маршруту ще немає. */
 const POLAND_CENTER: [number, number] = [19.0, 51.7];
@@ -61,11 +76,14 @@ const FOLLOW_EASE_MS = 900;
 export interface MapProps {
   route?: GeoJSON.Feature<GeoJSON.LineString>;
   stops?: RouteStop[];
+  /** Готові шматки колії з пайплайна — клієнт нічого не ріже. */
+  zones?: DeadZone[];
+  onZoneSelect?: (zone: DeadZone) => void;
   /** Джерело позиції; маркер оновлюється імперативно, без ререндера. */
   tracker?: TripTracker;
 }
 
-export function Map({ route, stops, tracker }: MapProps) {
+export function Map({ route, stops, zones, onZoneSelect, tracker }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [follow, setFollow] = useState(true);
@@ -73,6 +91,9 @@ export function Map({ route, stops, tracker }: MapProps) {
   followRef.current = follow;
   /** Ручний «перецентруйся зараз» — ефект карти публікує сюди свій обробник. */
   const applyRef = useRef<(() => void) | null>(null);
+  // Через ref, а не через deps: інакше кожен ререндер батька перестворював би карту.
+  const zoneSelectRef = useRef(onZoneSelect);
+  zoneSelectRef.current = onZoneSelect;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -116,10 +137,62 @@ export function Map({ route, stops, tracker }: MapProps) {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: { 'line-color': ROUTE_COLOR, 'line-width': 4 },
       });
+
+      if (!zones?.length) return;
+      // Поверх маршруту й ширше за нього — зона має читатись першою.
+      map.addSource(ZONE_SOURCE, { type: 'geojson', data: zonesToGeoJson(zones) });
+      map.addLayer({
+        id: ZONE_LAYER,
+        type: 'line',
+        source: ZONE_SOURCE,
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': ZONE_COLOR_EXPRESSION,
+          'line-width': 9,
+          'line-opacity': 0.85,
+        },
+      });
+
+      // Крапки — щоб усі зони маршруту було видно одразу, без зуму.
+      map.addSource(ZONE_MARKER_SOURCE, {
+        type: 'geojson',
+        data: zoneMarkersToGeoJson(zones),
+        // Кластеризації немає свідомо: злиплі крапки все одно кликабельні,
+        // а «17 зон» замість самих зон нічого не пояснює.
+      });
+      map.addLayer({
+        id: ZONE_MARKER_LAYER,
+        type: 'circle',
+        source: ZONE_MARKER_SOURCE,
+        paint: {
+          'circle-color': ZONE_COLOR_EXPRESSION,
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 10, 6, 14, 9],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#0b1120',
+        },
+      });
     };
 
     if (map.isStyleLoaded()) addRouteLayer();
     else map.on('style.load', addRouteLayer);
+
+    // Не `new Map(...)`: у цьому файлі `Map` — це наш компонент, а не колекція.
+    const byId: Record<string, DeadZone> = {};
+    for (const zone of zones ?? []) byId[zone.id] = zone;
+
+    const onZoneClick = (e: { features?: { properties?: Record<string, unknown> }[] }) => {
+      const id = e.features?.[0]?.properties?.id;
+      const zone = typeof id === 'string' ? byId[id] : undefined;
+      if (zone) zoneSelectRef.current?.(zone);
+    };
+    const setCursor = (value: string) => () => {
+      map.getCanvas().style.cursor = value;
+    };
+    for (const layer of [ZONE_LAYER, ZONE_MARKER_LAYER]) {
+      map.on('click', layer, onZoneClick);
+      map.on('mouseenter', layer, setCursor('pointer'));
+      map.on('mouseleave', layer, setCursor(''));
+    }
 
     // Маркер «я»: показуємо snapped-точку, щоб він не гуляв поруч із колією.
     const meEl = document.createElement('div');
@@ -173,7 +246,7 @@ export function Map({ route, stops, tracker }: MapProps) {
       map.remove();
       mapRef.current = null;
     };
-  }, [route, stops, tracker]);
+  }, [route, stops, zones, tracker]);
 
   return (
     <div className="map-wrap">
