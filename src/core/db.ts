@@ -24,7 +24,7 @@ export interface StoredBundle {
   bundle: RouteBundle;
 }
 
-export type SettingKey = 'operator' | 'lastTripId';
+export type SettingKey = 'operator' | 'lastTripId' | 'etaAlerts';
 
 export interface Setting {
   key: SettingKey;

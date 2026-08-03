@@ -6,9 +6,12 @@
  * статичну частину — станції — React малює один раз на бандл.
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEtaResult } from '../app/useEta';
 import { useTripUpdates } from '../app/useTrip';
-import { formatKm1, formatTime } from '../core/format';
-import { zoneSummary } from '../core/zones';
+import { useThrottledValue } from '../hooks/useThrottledValue';
+import { formatClock, formatKm1, formatTime } from '../core/format';
+import { formatZoneLength, zoneIcon, zoneSummary } from '../core/zones';
+import type { EtaStore } from '../core/eta-store';
 import type { TripSnapshot, TripTracker } from '../core/trip-tracker';
 import type { DeadZone, RouteStop } from '../core/types';
 
@@ -20,6 +23,18 @@ const MARKER_RATIO = 0.35;
 const MIN_LABEL_GAP_PX = 18;
 /** Тунель на 40 м — це 0.14 px. Смужку все одно треба бачити. */
 const MIN_ZONE_PX = 4;
+/** Розходження прогнозу з розкладом менше цього нікому не цікаве. */
+const PLAN_DRIFT_MS = 3 * 60_000;
+/**
+ * А більше цього — це вже не запізнення, а інший рейс дня (наприклад, симулятор
+ * о 15:00 на потязі 06:05). Порівнювати з ним планові часи безглуздо.
+ */
+const PLAN_DRIFT_MAX_MS = 6 * 3_600_000;
+/** Коротшу діру показуємо однією міткою: `~15:42–15:42` виглядає як помилка. */
+const ZONE_RANGE_MS = 60_000;
+
+/** Ключ мітки: `stop_id` може повторитись, якщо рейс двічі заходить на ту саму станцію. */
+const pointKey = (refId: string, km: number) => `${refId}|${km.toFixed(3)}`;
 
 interface RibbonStop {
   stop: RouteStop;
@@ -62,13 +77,33 @@ function layoutZones(zones: DeadZone[]): RibbonZone[] {
   });
 }
 
+interface ZoneTimes {
+  in?: number;
+  out?: number;
+}
+
+/** Мітка зони: `⛔ 2.2 км · ~15:42–15:49`, поки прогнозу немає — просто тип зони. */
+function zoneLabel(zone: DeadZone, times: ZoneTimes | undefined): string {
+  if (times?.in === undefined) return zoneSummary(zone);
+  const range =
+    times.out !== undefined && times.out - times.in >= ZONE_RANGE_MS
+      ? `~${formatClock(times.in)}–${formatClock(times.out)}`
+      : `~${formatClock(times.in)}`;
+  return `${zoneIcon(zone.severity)} ${formatZoneLength(zone.lengthKm)} · ${range}`;
+}
+
+/** Мітки часу оновлюємо рідко: щосекундні цифри в дорозі просто не читаються. */
+const ETA_REFRESH_MS = 10_000;
+
 export interface RouteRibbonProps {
   tracker: TripTracker;
+  /** Прогноз (задача 06): мітки часу біля станцій і зон. */
+  etaStore: EtaStore;
   /** Тап по зоні → bottom-sheet; його тримає екран поїздки. */
   onZoneSelect?: (zone: DeadZone) => void;
 }
 
-export function RouteRibbon({ tracker, onZoneSelect }: RouteRibbonProps) {
+export function RouteRibbon({ tracker, etaStore, onZoneSelect }: RouteRibbonProps) {
   const { bundle } = tracker;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const meRef = useRef<HTMLDivElement | null>(null);
@@ -79,6 +114,28 @@ export function RouteRibbon({ tracker, onZoneSelect }: RouteRibbonProps) {
   const stops = useMemo(() => layout(bundle.stops), [bundle.stops]);
   const zones = useMemo(() => layoutZones(bundle.deadZones), [bundle.deadZones]);
   const trackH = bundle.lengthKm * PX_PER_KM;
+
+  const eta = useThrottledValue(useEtaResult(etaStore), ETA_REFRESH_MS);
+
+  const stopEta = useMemo(() => {
+    const map = new Map<string, { eta: number; plan: number | null }>();
+    for (const point of eta?.timeline ?? []) {
+      if (point.kind === 'stop') map.set(pointKey(point.refId, point.km), point);
+    }
+    return map;
+  }, [eta]);
+
+  const zoneEta = useMemo(() => {
+    const map = new Map<string, ZoneTimes>();
+    for (const point of eta?.timeline ?? []) {
+      if (point.kind === 'stop') continue;
+      const times = map.get(point.refId) ?? {};
+      if (point.kind === 'zone-in') times.in = point.eta;
+      else times.out = point.eta;
+      map.set(point.refId, times);
+    }
+    return map;
+  }, [eta]);
 
   const apply = useCallback((snapshot: TripSnapshot) => {
     const scroll = scrollRef.current;
@@ -130,21 +187,36 @@ export function RouteRibbon({ tracker, onZoneSelect }: RouteRibbonProps) {
               onClick={() => onZoneSelect?.(zone)}
             >
               <span className="ribbon__zone-hit" />
-              {showLabel && <span className="ribbon__zone-label">{zoneSummary(zone)}</span>}
+              {showLabel && (
+                <span className="ribbon__zone-label">{zoneLabel(zone, zoneEta.get(zone.id))}</span>
+              )}
             </button>
           ))}
           <div className="ribbon__done" ref={doneRef} />
-          {stops.map(({ stop, top, showLabel }) => (
-            <div className="ribbon__stop" key={stop.id + stop.km} style={{ top }}>
-              <span className="ribbon__dot" />
-              {showLabel && (
-                <>
-                  <span className="ribbon__time">{formatTime(stop.dep ?? stop.arr)}</span>
-                  <span className="ribbon__name">{stop.name}</span>
-                </>
-              )}
-            </div>
-          ))}
+          {stops.map(({ stop, top, showLabel }) => {
+            const forecast = stopEta.get(pointKey(stop.id, stop.km));
+            const planned = formatTime(stop.arr ?? stop.dep);
+            // Плановий час показуємо сірим лише коли прогноз від нього помітно відійшов.
+            const gap =
+              forecast !== undefined && forecast.plan !== null
+                ? Math.abs(forecast.eta - forecast.plan)
+                : 0;
+            const drift = gap >= PLAN_DRIFT_MS && gap <= PLAN_DRIFT_MAX_MS;
+            return (
+              <div className="ribbon__stop" key={stop.id + stop.km} style={{ top }}>
+                <span className="ribbon__dot" />
+                {showLabel && (
+                  <>
+                    <span className="ribbon__time">
+                      {forecast === undefined ? planned : formatClock(forecast.eta)}
+                      {drift && <span className="ribbon__time-plan">{planned}</span>}
+                    </span>
+                    <span className="ribbon__name">{stop.name}</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div style={{ height: viewportH * (1 - MARKER_RATIO) }} />
       </div>

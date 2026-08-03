@@ -24,7 +24,7 @@ const CONFIDENCE_NOTE: Record<string, string> = {
 export function TripStatusBar({ tracker }: { tracker: TripTracker }) {
   const snapshot = useTripSnapshot(tracker);
   const { bundle } = tracker;
-  const { km, speedKmh, status, tracking, confidence, offsetM, simulated } = snapshot;
+  const { km, kmEstimated, speedKmh, status, tracking, confidence, offsetM, simulated } = snapshot;
 
   const next = km === null ? undefined : bundle.stops.find((stop) => stop.km > km + 0.05);
   const note = tracking ? CONFIDENCE_NOTE[confidence] : undefined;
@@ -39,7 +39,11 @@ export function TripStatusBar({ tracker }: { tracker: TripTracker }) {
           <span className="trip-status__unit">км/год</span>
         </div>
         <div className="trip-status__km">
-          <span className="trip-status__number trip-status__number--small">
+          <span
+            className={`trip-status__number trip-status__number--small${
+              kmEstimated ? ' trip-status__number--estimated' : ''
+            }`}
+          >
             {km === null ? '—' : formatKm1(km)}
           </span>
           <span className="trip-status__unit">із {formatKm1(bundle.lengthKm)} км</span>
@@ -49,6 +53,8 @@ export function TripStatusBar({ tracker }: { tracker: TripTracker }) {
       <div className="trip-status__row">
         <span className={`status-chip status-chip--${status}`}>{STATUS_LABEL[status]}</span>
         {note && <span className="trip-status__note">{note}</span>}
+        {/* У тунелі км рахується dead reckoning'ом — це має бути видно. */}
+        {kmEstimated && <span className="badge badge--muted">км — оцінка</span>}
         {simulated && <span className="badge badge--muted">симулятор</span>}
         {next && (
           <span className="trip-status__next">

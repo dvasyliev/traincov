@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { EtaHeader } from '../components/EtaHeader';
 import { Map } from '../components/Map';
 import { RouteRibbon } from '../components/RouteRibbon';
 import { TripStatusBar } from '../components/TripStatusBar';
 import { ZoneSheet } from '../components/ZoneSheet';
 import { useAppActions, useAppState } from '../app/app-state';
+import { useEtaStore } from '../app/useEta';
 import { useTripTracker } from '../app/useTrip';
 import { formatKm, formatTime } from '../core/format';
 import { operatorLabel } from '../core/operators';
@@ -25,6 +27,7 @@ export function Trip() {
 function TripView({ bundle, operator }: { bundle: RouteBundle; operator: OperatorId | null }) {
   const { setScreen } = useAppActions();
   const tracker = useTripTracker(bundle);
+  const etaStore = useEtaStore(tracker);
   const [view, setView] = useState<View>('ribbon');
   /** Один шит на екран: його відкривають і стрічка, і карта. */
   const [zone, setZone] = useState<DeadZone | null>(null);
@@ -47,6 +50,7 @@ function TripView({ bundle, operator }: { bundle: RouteBundle; operator: Operato
         {zonesCount ? `${zonesCount} мертвих зон` : 'зон не знайдено'}
       </div>
 
+      <EtaHeader store={etaStore} />
       <TripStatusBar tracker={tracker} />
 
       <div className="view-switch">
@@ -67,7 +71,7 @@ function TripView({ bundle, operator }: { bundle: RouteBundle; operator: Operato
       </div>
 
       {view === 'ribbon' ? (
-        <RouteRibbon tracker={tracker} onZoneSelect={setZone} />
+        <RouteRibbon tracker={tracker} etaStore={etaStore} onZoneSelect={setZone} />
       ) : (
         <Map
           route={bundle.shape}

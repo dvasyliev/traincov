@@ -473,6 +473,93 @@ button {
   color: var(--text-dim);
 }
 
+/* ---- прогноз: коли зникне інтернет (задача 06) ---- */
+
+.eta {
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-left: 4px solid var(--border);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.eta--zone-far,
+.eta--no-zones {
+  border-left-color: #1f7a4d;
+}
+
+.eta--zone-soon {
+  border-left-color: #f59e0b;
+  background: #1c1a10;
+}
+
+.eta--in-zone {
+  border-left-color: #ef4444;
+  background: #241016;
+}
+
+/* Флеш попередження: екран лежить на столику, помітити треба периферійним зором. */
+.eta--flash {
+  animation: eta-flash 0.9s ease-in-out 3;
+}
+
+@keyframes eta-flash {
+  0%,
+  100% {
+    background: #1c1a10;
+  }
+  50% {
+    background: #4a3a09;
+  }
+}
+
+.eta__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.eta__title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eta__bell {
+  flex: none;
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  font-size: 15px;
+  opacity: 0.5;
+}
+
+.eta__bell--on {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.eta__big {
+  margin-top: 4px;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.eta__meta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
 /* ---- статус поїздки (хедер із великими цифрами) ---- */
 
 .trip-status {
@@ -508,6 +595,11 @@ button {
 
 .trip-status__number--small {
   font-size: 26px;
+}
+
+/* Км із dead reckoning: цифра є, але вона — оцінка, а не факт. */
+.trip-status__number--estimated {
+  color: var(--text-dim);
 }
 
 .trip-status__unit {
@@ -707,6 +799,7 @@ button {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
+  max-width: calc(100% - 100px);
   padding: 2px 8px;
   border-radius: 10px;
   background: var(--bg-elevated);
@@ -714,6 +807,8 @@ button {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text);
 }
 
@@ -742,7 +837,15 @@ button {
   text-align: right;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* Плановий час — тільки коли прогноз від нього відійшов: інакше це шум. */
+.ribbon__time-plan {
+  display: block;
+  font-size: 10px;
   color: var(--text-dim);
+  text-decoration: line-through;
 }
 
 .ribbon__name {

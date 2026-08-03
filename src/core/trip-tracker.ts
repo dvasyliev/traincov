@@ -28,8 +28,16 @@ export interface TripSnapshot {
   tracking: boolean;
   status: TripStatus;
   km: number | null;
+  /**
+   * `true` — км не з GPS, а порахований dead reckoning'ом (тунель).
+   * Саме в дірі користувач дивиться на екран найпильніше, тож рух маркера
+   * там важливіший за формальну точність — але позначка обов'язкова.
+   */
+  kmEstimated: boolean;
   speedKmh: number | null;
   confidence: SpeedConfidence;
+  /** Відколи стоїмо, ms epoch — прогноз віднімає це від планової стоянки. */
+  stoppedSince: number | null;
   offsetM: number | null;
   /** Точка на колії — саме її показує карта. */
   snapped: [number, number] | null;
@@ -41,6 +49,8 @@ export interface TripSnapshot {
 export interface TripTracker {
   readonly bundle: RouteBundle;
   readonly locator: RouteLocator;
+  /** «Зараз» у шкалі фіксів: у симуляторі час віртуальний. */
+  now(): number;
   getSnapshot(): TripSnapshot;
   subscribe(listener: () => void): () => void;
   start(): void;
@@ -55,8 +65,10 @@ function idleSnapshot(simulated: boolean): TripSnapshot {
     tracking: false,
     status: 'idle',
     km: null,
+    kmEstimated: false,
     speedKmh: null,
     confidence: 'none',
+    stoppedSince: null,
     offsetM: null,
     snapped: null,
     lastFixTs: null,
@@ -70,8 +82,10 @@ function same(a: TripSnapshot, b: TripSnapshot): boolean {
     a.tracking === b.tracking &&
     a.status === b.status &&
     a.km === b.km &&
+    a.kmEstimated === b.kmEstimated &&
     a.speedKmh === b.speedKmh &&
     a.confidence === b.confidence &&
+    a.stoppedSince === b.stoppedSince &&
     a.offsetM === b.offsetM &&
     a.lastFixTs === b.lastFixTs &&
     a.error === b.error
@@ -86,6 +100,8 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
   let snapshot = idleSnapshot(source.kind === 'simulated');
   let timer: ReturnType<typeof setInterval> | null = null;
   let started = false;
+  /** Момент останнього кроку dead reckoning — щоб не інтегрувати той самий Δt двічі. */
+  let reckonedAt: number | null = null;
 
   const publish = (next: TripSnapshot) => {
     if (same(snapshot, next)) return;
@@ -120,11 +136,14 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
           accuracyM: fix.accuracyM,
         });
 
+    reckonedAt = null;
     commit({
       tracking: true,
       km: position.km,
+      kmEstimated: false,
       speedKmh: speedState.speedKmh,
       confidence: speedState.confidence,
+      stoppedSince: speedState.stoppedSince,
       offsetM: Math.round(position.offsetM),
       snapped: position.snapped,
       lastFixTs: fix.ts,
@@ -135,14 +154,34 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
 
   const tick = () => {
     if (!started) return;
-    const speedState = speed.state(source.now());
+    const now = source.now();
+    const speedState = speed.state(now);
+
+    // Dead reckoning: фіксів немає (тунель), але потяг їде. Рухаємо км за
+    // останньою відомою швидкістю — інакше в дірі екран просто завмирає.
+    let km = snapshot.km;
+    let snapped = snapshot.snapped;
+    let kmEstimated = snapshot.kmEstimated;
+    const stale = snapshot.lastFixTs !== null && now - snapshot.lastFixTs > STALE_FIX_MS;
+    const kmh = speedState.speedKmh;
+
+    if (stale && km !== null && kmh !== null && kmh > 0 && !speedState.stopped) {
+      const from = reckonedAt ?? snapshot.lastFixTs ?? now;
+      km = Math.min(bundle.lengthKm, km + (kmh * (now - from)) / 3_600_000);
+      snapped = locator.coordinateAt(km);
+      kmEstimated = true;
+    }
+    reckonedAt = now;
+
     commit({
       tracking: true,
-      km: snapshot.km,
+      km,
+      kmEstimated,
       speedKmh: speedState.speedKmh,
       confidence: speedState.confidence,
+      stoppedSince: speedState.stoppedSince,
       offsetM: snapshot.offsetM,
-      snapped: snapshot.snapped,
+      snapped,
       lastFixTs: snapshot.lastFixTs,
       error: snapshot.error,
       simulated: snapshot.simulated,
@@ -152,6 +191,8 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
   return {
     bundle,
     locator,
+
+    now: () => source.now(),
 
     getSnapshot: () => snapshot,
 
@@ -165,6 +206,7 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
       started = true;
       locator.reset();
       speed.reset();
+      reckonedAt = null;
       commit({ ...idleSnapshot(snapshot.simulated), tracking: true });
       // Таймер заводимо ДО source.start: відмова може прийти синхронно
       // (немає geolocation узагалі) і має мати що прибирати.

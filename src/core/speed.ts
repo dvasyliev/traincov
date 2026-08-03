@@ -27,6 +27,11 @@ export interface SpeedState {
   confidence: SpeedConfidence;
   /** Стоїмо на станції/семафорі — важливо для прогнозу в задачі 06. */
   stopped: boolean;
+  /**
+   * Відколи швидкість нижча за поріг, ms epoch; `null` — коли їдемо.
+   * Прогноз віднімає це від планової стоянки: стоїмо довше плану — час тече далі.
+   */
+  stoppedSince: number | null;
 }
 
 /** ~30 c сталої часу при тіку 5 c. */
@@ -60,7 +65,12 @@ export function createSpeedEstimator(): SpeedEstimator {
   let stopped = false;
 
   function current(): SpeedState {
-    return { speedKmh: ema === null ? null : Math.round(ema * 10) / 10, confidence, stopped };
+    return {
+      speedKmh: ema === null ? null : Math.round(ema * 10) / 10,
+      confidence,
+      stopped,
+      stoppedSince: stopped ? slowSince : null,
+    };
   }
 
   return {
@@ -103,7 +113,8 @@ export function createSpeedEstimator(): SpeedEstimator {
     },
 
     state(now) {
-      if (lastTs === null) return { speedKmh: null, confidence: 'none', stopped: false };
+      if (lastTs === null)
+        return { speedKmh: null, confidence: 'none', stopped: false, stoppedSince: null };
       // Швидкість лишаємо останню відому — вона чесніша за нуль, поки потяг у тунелі.
       if (now - lastTs > STALE_FIX_MS) return { ...current(), confidence: 'none' };
       return current();
