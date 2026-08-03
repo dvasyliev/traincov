@@ -8,6 +8,11 @@ export function formatKm(km: number): string {
   return `${Math.round(km)} км`;
 }
 
+/** `45.72` → `45.7` — у дорозі десята частка км уже щось значить. */
+export function formatKm1(km: number): string {
+  return km.toFixed(1);
+}
+
 /**
  * Нормалізація для пошуку: діакритика геть, нижній регістр.
  * «wroclaw» має знаходити «Wrocław», «gdansk» — «Gdańsk».

@@ -473,9 +473,309 @@ button {
   color: var(--text-dim);
 }
 
+/* ---- статус поїздки (хедер із великими цифрами) ---- */
+
+.trip-status {
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.trip-status__main {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.trip-status__speed,
+.trip-status__km {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.trip-status__km {
+  margin-left: auto;
+}
+
+.trip-status__number {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-status__number--small {
+  font-size: 26px;
+}
+
+.trip-status__unit {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.trip-status__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.trip-status__note {
+  color: var(--text-dim);
+}
+
+.trip-status__next {
+  margin-left: auto;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-status .button {
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.status-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.status-chip--moving {
+  border-color: #1f7a4d;
+  background: #10281d;
+  color: #52d193;
+}
+
+.status-chip--stopped {
+  border-color: #7a5b1f;
+  background: #241d0e;
+  color: #f0cf8a;
+}
+
+.status-chip--acquiring {
+  border-color: #2b4a7a;
+  background: #101c2e;
+  color: #8fb6f0;
+}
+
+.status-chip--no-gps,
+.status-chip--off-route,
+.status-chip--denied {
+  border-color: var(--accent);
+  background: #2a0f1a;
+  color: #ffb4c4;
+}
+
+/* ---- перемикач стрічка / карта ---- */
+
+.view-switch {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.view-switch__item {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.view-switch__item--active {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---- стрічка маршруту ---- */
+
+.ribbon {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.ribbon__scroll {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain; /* інакше скрол стрічки тягне pull-to-refresh */
+  -webkit-overflow-scrolling: touch;
+}
+
+.ribbon__track {
+  position: relative;
+}
+
+.ribbon__rail,
+.ribbon__done {
+  position: absolute;
+  left: 64px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.ribbon__rail {
+  top: 0;
+  bottom: 0;
+  background: var(--border);
+}
+
+.ribbon__done {
+  top: 0;
+  height: 0;
+  background: var(--accent);
+}
+
+.ribbon__stop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+}
+
+.ribbon__dot {
+  position: absolute;
+  left: 61px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--text-dim);
+}
+
+.ribbon__time {
+  position: absolute;
+  left: 0;
+  width: 52px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.ribbon__name {
+  position: absolute;
+  left: 82px;
+  right: 12px;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* top задає RouteRibbon інлайном — MARKER_RATIO має бути в одному місці. */
+.ribbon__me {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ribbon__me::before {
+  content: '';
+  position: absolute;
+  left: 52px;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.ribbon__me-dot {
+  position: absolute;
+  left: 58px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--bg);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.ribbon__me[data-status='no-gps'] .ribbon__me-dot,
+.ribbon__me[data-status='off-route'] .ribbon__me-dot {
+  background: var(--text-dim);
+  box-shadow: 0 0 0 2px var(--text-dim);
+}
+
+.ribbon__me-label {
+  position: absolute;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- карта ---- */
+
+.map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
 .map-container {
   flex: 1;
   min-height: 0;
+}
+
+.map-follow {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(11, 17, 32, 0.85);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.map-follow--on {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.me-marker {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.5);
+}
+
+.me-marker[data-status='no-gps'],
+.me-marker[data-status='off-route'] {
+  background: #8fa1c4;
+  box-shadow: 0 0 0 2px rgba(143, 161, 196, 0.5);
 }
 
 .stop-marker {

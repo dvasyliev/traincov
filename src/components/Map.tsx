@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MapLibreMap,
   Marker,
@@ -15,6 +15,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import { bbox } from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { RouteStop } from '../core/types';
+import type { TripTracker } from '../core/trip-tracker';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -53,14 +54,25 @@ function routeBounds(route: GeoJSON.Feature<GeoJSON.LineString>): LngLatBoundsLi
   ];
 }
 
+/** Зум, на який переходимо, коли вмикається слідування за позицією. */
+const FOLLOW_ZOOM = 12;
+const FOLLOW_EASE_MS = 900;
+
 export interface MapProps {
   route?: GeoJSON.Feature<GeoJSON.LineString>;
   stops?: RouteStop[];
+  /** Джерело позиції; маркер оновлюється імперативно, без ререндера. */
+  tracker?: TripTracker;
 }
 
-export function Map({ route, stops }: MapProps) {
+export function Map({ route, stops, tracker }: MapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const [follow, setFollow] = useState(true);
+  const followRef = useRef(follow);
+  followRef.current = follow;
+  /** Ручний «перецентруйся зараз» — ефект карти публікує сюди свій обробник. */
+  const applyRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -109,12 +121,77 @@ export function Map({ route, stops }: MapProps) {
     if (map.isStyleLoaded()) addRouteLayer();
     else map.on('style.load', addRouteLayer);
 
+    // Маркер «я»: показуємо snapped-точку, щоб він не гуляв поруч із колією.
+    const meEl = document.createElement('div');
+    meEl.className = 'me-marker';
+    meEl.style.display = 'none';
+    const me = new Marker({ element: meEl, pitchAlignment: 'map' })
+      .setLngLat(POLAND_CENTER)
+      .addTo(map);
+
+    let lastEaseTs = 0;
+    const applyPosition = () => {
+      const snapshot = tracker?.getSnapshot();
+      if (!snapshot?.snapped) {
+        meEl.style.display = 'none';
+        return;
+      }
+      meEl.style.display = '';
+      meEl.dataset.status = snapshot.status;
+      me.setLngLat(snapshot.snapped);
+      if (!followRef.current) return;
+      // Фікси йдуть частіше, ніж триває анімація; без тротлінга камера смикається.
+      const now = Date.now();
+      if (now - lastEaseTs < FOLLOW_EASE_MS) return;
+      lastEaseTs = now;
+      map.easeTo({
+        center: snapshot.snapped,
+        zoom: Math.max(map.getZoom(), FOLLOW_ZOOM),
+        duration: FOLLOW_EASE_MS,
+      });
+    };
+
+    applyRef.current = () => {
+      lastEaseTs = 0;
+      applyPosition();
+    };
+    applyPosition();
+    const unsubscribe = tracker?.subscribe(applyPosition);
+
+    // Драг карти = «я сам дивлюсь» → слідування вимикаємо, як у навігаторах.
+    const onDragStart = () => {
+      if (followRef.current) setFollow(false);
+    };
+    map.on('dragstart', onDragStart);
+
     return () => {
+      unsubscribe?.();
+      map.off('dragstart', onDragStart);
+      applyRef.current = null;
+      me.remove();
       for (const marker of markers) marker.remove();
       map.remove();
       mapRef.current = null;
     };
-  }, [route, stops]);
+  }, [route, stops, tracker]);
 
-  return <div ref={containerRef} className="map-container" />;
+  return (
+    <div className="map-wrap">
+      <div ref={containerRef} className="map-container" />
+      {tracker && (
+        <button
+          type="button"
+          className={`map-follow ${follow ? 'map-follow--on' : ''}`}
+          onClick={() => {
+            const next = !follow;
+            followRef.current = next;
+            setFollow(next);
+            if (next) applyRef.current?.();
+          }}
+        >
+          {follow ? '🎯 слідкую' : '🎯 слідкувати'}
+        </button>
+      )}
+    </div>
+  );
 }

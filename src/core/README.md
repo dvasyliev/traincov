@@ -3,4 +3,10 @@
 - `types.ts` — формат route bundle і index.json. **Єдине джерело типів**:
   той самий файл імпортує і апка, і `scripts/pipeline/`, тож несумісність
   ловиться на typecheck, а не в рантаймі.
-- `linref.ts` / `speed.ts` / `eta.ts` / `probe.ts` зʼявляться в задачах 04–08.
+- `linref.ts` — проєкція GPS на колію: км уздовж маршруту, offset, монотонність.
+- `speed.ts` — швидкість (GPS або Δkm/Δt) з EMA-згладжуванням і станом «стоїмо».
+- `geo-source.ts` — `watchPosition` за спільним інтерфейсом `GeoSource`.
+- `simulator.ts` — той самий інтерфейс, але фікси генеруються з розкладу (`?sim=1`).
+- `trip-tracker.ts` — стан поїздки як зовнішній стор (`subscribe`/`getSnapshot`),
+  щоб GPS-тіки не тягли за собою ререндер усього дерева.
+- `eta.ts` / `probe.ts` зʼявляться в задачах 06 і 08.
