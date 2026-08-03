@@ -1,0 +1,198 @@
+:root {
+  --bg: #0b1120;
+  --bg-elevated: #131c31;
+  --border: #1e2a44;
+  --text: #e8eefc;
+  --text-dim: #8fa1c4;
+  --accent: #e11d48;
+
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---- layout ---- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.app__body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.screen {
+  height: 100%;
+}
+
+.screen--padded {
+  padding: calc(env(safe-area-inset-top) + 24px) 20px 20px;
+  overflow-y: auto;
+}
+
+.screen--full {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- tab bar ---- */
+
+.tabbar {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 0 8px;
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+}
+
+.tabbar__item--active {
+  color: var(--text);
+}
+
+.tabbar__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tabbar__label {
+  font-size: 12px;
+}
+
+/* ---- home / log ---- */
+
+.title {
+  margin: 0;
+  font-size: 32px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 4px 0 24px;
+  color: var(--text-dim);
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.card__label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.card__value {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.card__meta {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.button {
+  margin-top: 16px;
+  width: 100%;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.hint {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* ---- trip / map ---- */
+
+.trip-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.trip-header__badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.trip-header__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 0;
+}
+
+.stop-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+/* MapLibre контроли в тёмній темі */
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
