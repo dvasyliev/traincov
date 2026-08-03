@@ -1,30 +1,31 @@
 import { Map } from '../components/Map';
-import type { RouteState } from '../data/route-bundle';
-import { formatTime } from '../data/route-bundle';
+import { useAppActions, useAppState } from '../app/app-state';
+import { formatKm, formatTime } from '../core/format';
+import { operatorLabel } from '../core/operators';
 
-export function Trip({ route }: { route: RouteState }) {
-  if (route.status !== 'ready') {
-    return (
-      <div className="screen screen--padded">
-        <p className="hint">
-          {route.status === 'loading' ? 'Завантаження маршруту…' : route.message}
-        </p>
-      </div>
-    );
-  }
+export function Trip() {
+  const { currentTrip, operator } = useAppState();
+  const { setScreen } = useAppActions();
 
-  const { bundle } = route;
+  // Редірект робить App; сюди потрапляємо лише на кадр між dispatch і ререндером.
+  if (!currentTrip) return null;
+
+  const last = currentTrip.stops[currentTrip.stops.length - 1];
 
   return (
     <div className="screen screen--full">
       <header className="trip-header">
-        <span className="trip-header__badge">{bundle.carrier}</span>
-        <span className="trip-header__title">{bundle.name}</span>
-        <span className="trip-header__meta">
-          {formatTime(bundle.stops[0].dep)} · {bundle.lengthKm} км
-        </span>
+        <span className="trip-header__badge">{currentTrip.carrier}</span>
+        <span className="trip-header__title">{currentTrip.name}</span>
+        <button type="button" className="trip-header__change" onClick={() => setScreen('home')}>
+          {operator ? operatorLabel(operator) : 'оператор'} · змінити
+        </button>
       </header>
-      <Map route={bundle.shape} stops={bundle.stops} />
+      <div className="trip-subheader">
+        {formatTime(currentTrip.stops[0]?.dep ?? null)} → {formatTime(last?.arr ?? null)} ·{' '}
+        {formatKm(currentTrip.lengthKm)} · {currentTrip.stops.length} зупинок
+      </div>
+      <Map route={currentTrip.shape} stops={currentTrip.stops} />
     </div>
   );
 }

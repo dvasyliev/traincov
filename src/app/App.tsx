@@ -1,24 +1,38 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { Home } from '../screens/Home';
 import { Trip } from '../screens/Trip';
 import { Log } from '../screens/Log';
 import { TabBar } from './TabBar';
-import type { Screen } from './screens';
-import { useRouteBundle } from '../data/route-bundle';
+import { Toast } from '../components/Toast';
+import { AppStateProvider } from './AppStateProvider';
+import { useAppActions, useAppState } from './app-state';
 
-export function App() {
-  const [screen, setScreen] = useState<Screen>('home');
-  // Один бандл на весь застосунок: Home і Trip дивляться на той самий стан.
-  const route = useRouteBundle();
+function Shell() {
+  const { screen, currentTrip, toast } = useAppState();
+  const { setScreen, dismissToast } = useAppActions();
+
+  // Trip без обраного рейсу показувати нічого — повертаємо на Home.
+  useEffect(() => {
+    if (screen === 'trip' && !currentTrip) setScreen('home');
+  }, [screen, currentTrip, setScreen]);
 
   return (
     <div className="app">
       <main className="app__body">
-        {screen === 'home' && <Home route={route} onOpenTrip={() => setScreen('trip')} />}
-        {screen === 'trip' && <Trip route={route} />}
+        {screen === 'home' && <Home />}
+        {screen === 'trip' && <Trip />}
         {screen === 'log' && <Log />}
       </main>
-      <TabBar active={screen} onChange={setScreen} />
+      {toast && <Toast message={toast} onDismiss={dismissToast} />}
+      <TabBar active={screen} onChange={setScreen} disabled={currentTrip ? [] : ['trip']} />
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <AppStateProvider>
+      <Shell />
+    </AppStateProvider>
   );
 }

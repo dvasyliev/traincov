@@ -2,7 +2,8 @@
 
 PWA, що для обраного залізничного рейсу в Польщі показує, **де і коли зникне мобільний інтернет**.
 
-План MVP — [docs/00-PLAN.md](docs/00-PLAN.md). Поточний стан: **задача 02** (пайплайн GTFS → route bundles; апка рендерить реальну колію).
+План MVP — [docs/00-PLAN.md](docs/00-PLAN.md). Поточний стан: **задача 03** (вибір рейсу й оператора;
+бандли зберігаються в IndexedDB, вибір переживає перезапуск).
 
 ## Запуск
 
@@ -63,13 +64,22 @@ scripts/pipeline/  офлайн-пайплайн GTFS → бандли (Node + t
   config.ts          TARGET-напрямки, дата розкладу, клампи
   index.ts           оркестрація
 src/
-  app/          роутинг (useState-таби, без react-router) + layout
-  screens/      Home.tsx, Trip.tsx, Log.tsx
-  components/   Map.tsx — єдине місце роботи з MapLibre
-  core/         types.ts + чиста логіка без React (linref/speed/eta/probe — задачі 04–08)
-  data/         route-bundle.ts — завантаження index.json і бандлів
+  app/          таби (без react-router) + AppState: reducer, контекст, гідратація з Dexie
+  screens/      Home.tsx (вибір рейсу), Trip.tsx (карта), Log.tsx
+  components/   Map.tsx — єдине місце роботи з MapLibre; TripCard, OperatorPicker, Toast
+  core/         types.ts, db.ts (Dexie), operators.ts, format.ts, trip-search.ts —
+                чиста логіка без React (linref/speed/eta/probe — задачі 04–08)
+  data/         trip-index.ts (index.json + кеш), route-bundle.ts, http.ts
+  hooks/        useOnlineStatus — чесний банер «офлайн» на Home
   styles/       global.css — тёмна тема, safe-area, 100dvh
 ```
+
+### Стан і збереження
+
+- IndexedDB (Dexie, база `traincov`): `bundles` — завантажені маршрути, `settings` — `operator`
+  і `lastTripId`. Обраний рейс і оператор відновлюються при старті.
+- Повторний вибір раніше відкритого рейсу працює без мережі (бандл береться з Dexie).
+- Очистити збережені пакети — екран **Логер** → «Очистити всі».
 
 ## Нотатки
 
