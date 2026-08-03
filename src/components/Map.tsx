@@ -14,7 +14,7 @@ import {
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { bbox } from '@turf/turf';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { DemoRouteStop } from '../data/demo-route';
+import type { RouteStop } from '../core/types';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -55,7 +55,7 @@ function routeBounds(route: GeoJSON.Feature<GeoJSON.LineString>): LngLatBoundsLi
 
 export interface MapProps {
   route?: GeoJSON.Feature<GeoJSON.LineString>;
-  stops?: DemoRouteStop[];
+  stops?: RouteStop[];
 }
 
 export function Map({ route, stops }: MapProps) {

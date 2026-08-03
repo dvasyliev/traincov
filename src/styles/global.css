@@ -151,6 +151,20 @@ button {
   color: var(--text-dim);
 }
 
+.hint code,
+.card__meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
+}
+
+.attribution {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* ---- trip / map ---- */
 
 .trip-header {
@@ -175,6 +189,16 @@ button {
 .trip-header__title {
   font-size: 14px;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-header__meta {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .map-container {
