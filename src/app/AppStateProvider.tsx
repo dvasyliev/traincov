@@ -3,9 +3,11 @@ import type { TripIndexEntry } from '../core/types';
 import { isOperatorId, type OperatorId } from '../core/operators';
 import {
   clearStoredBundles,
+  closeStaleLogSessions,
   getSetting,
   getStoredBundle,
   listSavedTrips,
+  pruneMeasurements,
   pruneStoredBundles,
   setSetting,
   storeBundle,
@@ -35,9 +37,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         // Спершу прибрати бандли старого формату, потім читати список збережених.
         await pruneStoredBundles().catch(() => 0);
-        const [operator, lastTripId, saved] = await Promise.all([
+        // Ротація логу — теж при старті: у дорозі на це часу вже не буде.
+        // Разом із нею закриваємо сесії, які лишились відкритими після kill PWA.
+        void pruneMeasurements()
+          .then(() => closeStaleLogSessions())
+          .catch(() => 0);
+        const [operator, lastTripId, logging, saved] = await Promise.all([
           getSetting('operator'),
           getSetting('lastTripId'),
+          getSetting('probeLogging'),
           listSavedTrips(),
         ]);
         const trip =
@@ -48,11 +56,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             operator: isOperatorId(operator) ? operator : null,
             trip,
             saved,
+            // Не збережено — значить, увімкнено: збір замірів за замовчуванням on.
+            logging: logging !== false,
           });
         }
       } catch {
         // IndexedDB недоступний (приватний режим Safari) — працюємо без збереження.
-        if (!cancelled) dispatch({ type: 'hydrated', operator: null, trip: null, saved: [] });
+        if (!cancelled) {
+          dispatch({ type: 'hydrated', operator: null, trip: null, saved: [], logging: true });
+        }
       }
     })();
 
@@ -70,6 +82,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const setOperator = useCallback((operator: OperatorId) => {
     dispatch({ type: 'operator', operator });
     void setSetting('operator', operator).catch(() => {});
+  }, []);
+
+  const setLogging = useCallback((logging: boolean) => {
+    dispatch({ type: 'logging', logging });
+    void setSetting('probeLogging', logging).catch(() => {});
   }, []);
 
   const setScreen = useCallback((screen: Screen) => dispatch({ type: 'screen', screen }), []);
@@ -111,8 +128,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const dismissToast = useCallback(() => dispatch({ type: 'toast', message: null }), []);
 
   const actions = useMemo<AppActions>(
-    () => ({ setOperator, setScreen, selectTrip, openCurrentTrip, clearBundles, dismissToast }),
-    [setOperator, setScreen, selectTrip, openCurrentTrip, clearBundles, dismissToast],
+    () => ({
+      setOperator,
+      setLogging,
+      setScreen,
+      selectTrip,
+      openCurrentTrip,
+      clearBundles,
+      dismissToast,
+    }),
+    [setOperator, setLogging, setScreen, selectTrip, openCurrentTrip, clearBundles, dismissToast],
   );
 
   return (

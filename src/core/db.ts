@@ -1,5 +1,13 @@
 import Dexie, { type Table } from 'dexie';
 import { entryFromBundle, type SavedTrip } from './offline';
+import {
+  makeSessionId,
+  measurementQuality,
+  newLogSession,
+  type LogSession,
+  type Measurement,
+} from './measurements';
+import type { OperatorId } from './operators';
 import type { RouteBundle, TripIndexEntry } from './types';
 
 /**
@@ -25,7 +33,7 @@ export interface StoredBundle {
   bundle: RouteBundle;
 }
 
-export type SettingKey = 'operator' | 'lastTripId' | 'etaAlerts';
+export type SettingKey = 'operator' | 'lastTripId' | 'etaAlerts' | 'probeLogging';
 
 export interface Setting {
   key: SettingKey;
@@ -40,11 +48,22 @@ class TrainCovDB extends Dexie {
    * намалювати список, не піднімаючи в пам'ять десятки бандлів по сотні КБ.
    */
   savedTrips!: Table<SavedTrip, string>;
+  /** Заміри якості зв'язку (задача 08) — сировина для карт покриття у v2. */
+  measurements!: Table<Measurement, number>;
+  /** Картка поїздки: рейс, оператор, лічильники, «фото» прогнозованих зон. */
+  logSessions!: Table<LogSession, string>;
 
   constructor() {
     super('traincov');
     this.version(1).stores({ bundles: 'tripId', settings: 'key' });
     this.version(2).stores({ bundles: 'tripId', settings: 'key', savedTrips: 'tripId' });
+    this.version(3).stores({
+      bundles: 'tripId',
+      settings: 'key',
+      savedTrips: 'tripId',
+      measurements: '++id, sessionId, ts',
+      logSessions: 'id, startedAt',
+    });
   }
 }
 
@@ -157,4 +176,172 @@ export async function clearStoredBundles(): Promise<void> {
   await db.bundles.clear();
   await db.savedTrips.clear();
   await db.settings.delete('lastTripId');
+}
+
+/* ------------------------------- заміри (08) ------------------------------ */
+
+/** Стеля ротації. ~10 c на замір → це приблизно 55 годин поїздок. */
+export const MAX_MEASUREMENTS = 20_000;
+
+/**
+ * Пауза, після якої повернення на екран поїздки вважається новою сесією.
+ *
+ * Перехід на вкладку «Логер» знімає трекер (задача 04), тож без цього вікна
+ * кожен погляд у логи різав би одну поїздку на кілька недосесій.
+ */
+export const SESSION_RESUME_MS = 15 * 60_000;
+
+/**
+ * Сесія для поточної поїздки: продовжуємо недавню по тому ж рейсу або відкриваємо нову.
+ */
+export async function openLogSession(
+  bundle: RouteBundle,
+  operator: OperatorId | null,
+  simulated: boolean,
+  now = Date.now(),
+): Promise<LogSession> {
+  const recent = await db.logSessions
+    .where('startedAt')
+    .above(now - 24 * 3_600_000)
+    .filter((session) => session.tripId === bundle.tripId && session.simulated === simulated)
+    .last();
+
+  if (recent && now - (recent.endedAt ?? recent.startedAt) < SESSION_RESUME_MS) {
+    // Оператор могли перемкнути між заходами — картка має відповідати останньому.
+    const resumed: LogSession = { ...recent, operator, endedAt: null };
+    await db.logSessions.put(resumed);
+    return resumed;
+  }
+
+  // Колізія id можлива лише при двох стартах в одну мілісекунду — але тоді це
+  // саме продовження, і мовчки злити сесії гірше, ніж зсунути мітку на 1 мс.
+  let startedAt = now;
+  while (await db.logSessions.get(makeSessionId(bundle.tripId, startedAt))) startedAt += 1;
+
+  const session = newLogSession(bundle, operator, startedAt, simulated);
+  await db.logSessions.put(session);
+  return session;
+}
+
+export async function closeLogSession(sessionId: string, now = Date.now()): Promise<void> {
+  const session = await db.logSessions.get(sessionId);
+  if (!session) return;
+  await db.logSessions.put({ ...session, endedAt: now });
+}
+
+/**
+ * Сесії, які лишилися «активними»: iOS убив PWA посеред поїздки, і закрити їх
+ * не встиг ніхто. Закриваємо часом останнього заміру — бейдж «активна» на
+ * позавчорашній поїздці читається як баг.
+ */
+export async function closeStaleLogSessions(now = Date.now()): Promise<number> {
+  const open = await db.logSessions.filter((session) => session.endedAt === null).toArray();
+  let closed = 0;
+  for (const session of open) {
+    const last = await db.measurements.where('sessionId').equals(session.id).last();
+    const endedAt = last?.ts ?? session.startedAt;
+    if (now - endedAt < SESSION_RESUME_MS) continue;
+    await db.logSessions.put({ ...session, endedAt });
+    closed += 1;
+  }
+  return closed;
+}
+
+/**
+ * Замір + лічильники сесії однією транзакцією: розбіжність між списком
+ * («12 замірів») і стрічкою (60 тиків) виглядає як баг даних, а не як гонка.
+ */
+export async function appendMeasurement(measurement: Measurement): Promise<void> {
+  await db.transaction('rw', db.measurements, db.logSessions, async () => {
+    await db.measurements.add(measurement);
+    const session = await db.logSessions.get(measurement.sessionId);
+    if (!session) return;
+    const quality = measurementQuality(measurement.probeOk, measurement.probeRttMs);
+    await db.logSessions.put({
+      ...session,
+      count: session.count + 1,
+      deadCount: session.deadCount + (quality === 'dead' ? 1 : 0),
+      poorCount: session.poorCount + (quality === 'poor' ? 1 : 0),
+    });
+  });
+}
+
+/** Найновіші зверху — саме щойно завершена поїздка цікавить найбільше. */
+export async function listLogSessions(): Promise<LogSession[]> {
+  return (await db.logSessions.orderBy('startedAt').toArray()).reverse();
+}
+
+export async function listMeasurements(sessionId: string): Promise<Measurement[]> {
+  const rows = await db.measurements.where('sessionId').equals(sessionId).toArray();
+  return rows.sort((a, b) => a.ts - b.ts);
+}
+
+export async function deleteLogSession(sessionId: string): Promise<void> {
+  await db.transaction('rw', db.measurements, db.logSessions, async () => {
+    const ids = (await db.measurements
+      .where('sessionId')
+      .equals(sessionId)
+      .primaryKeys()) as number[];
+    await db.measurements.bulkDelete(ids);
+    await db.logSessions.delete(sessionId);
+  });
+}
+
+export async function clearMeasurements(): Promise<void> {
+  await db.transaction('rw', db.measurements, db.logSessions, async () => {
+    await db.measurements.clear();
+    await db.logSessions.clear();
+  });
+}
+
+/**
+ * Ротація при старті: тримаємо останні `MAX_MEASUREMENTS` замірів.
+ *
+ * Ріжемо цілими сесіями, від найстаріших: напівз'їдена поїздка гірша за
+ * відсутню — її стрічка показувала б діру там, де просто немає даних.
+ * Найновішу сесію не чіпаємо ніколи, лише підрізаємо їй хвіст.
+ */
+export async function pruneMeasurements(): Promise<number> {
+  const total = await db.measurements.count();
+  if (total <= MAX_MEASUREMENTS) return 0;
+
+  let excess = total - MAX_MEASUREMENTS;
+  let removed = 0;
+
+  const sessions = await db.logSessions.orderBy('startedAt').toArray();
+  for (const session of sessions.slice(0, -1)) {
+    if (excess <= 0) break;
+    const ids = (await db.measurements
+      .where('sessionId')
+      .equals(session.id)
+      .primaryKeys()) as number[];
+    await db.measurements.bulkDelete(ids);
+    await db.logSessions.delete(session.id);
+    excess -= ids.length;
+    removed += ids.length;
+  }
+
+  if (excess > 0) {
+    const ids = (await db.measurements
+      .orderBy('ts')
+      .limit(excess)
+      .primaryKeys()) as number[];
+    await db.measurements.bulkDelete(ids);
+    removed += ids.length;
+  }
+
+  // Рядки зникли — лічильники сесій треба перерахувати, інакше «% dead» бреше.
+  const stale = await db.logSessions.toArray();
+  for (const session of stale) {
+    const rows = await db.measurements.where('sessionId').equals(session.id).toArray();
+    if (rows.length === session.count) continue;
+    await db.logSessions.put({
+      ...session,
+      count: rows.length,
+      deadCount: rows.filter((r) => measurementQuality(r.probeOk, r.probeRttMs) === 'dead').length,
+      poorCount: rows.filter((r) => measurementQuality(r.probeOk, r.probeRttMs) === 'poor').length,
+    });
+  }
+
+  return removed;
 }

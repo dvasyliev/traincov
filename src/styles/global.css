@@ -1157,3 +1157,158 @@ button {
 .maplibregl-ctrl-attrib {
   font-size: 10px;
 }
+
+/* ---- логер замірів (задача 08) ---- */
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.switch input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: inherit;
+}
+
+.session--active {
+  border-color: var(--accent);
+}
+
+.session__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.session__date {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.session__name {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session__meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Міні-стрічка «якість по маршруту»: вісь км, факт поверх прогнозу. */
+.qribbon {
+  margin-bottom: 16px;
+}
+
+.qribbon__track {
+  position: relative;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.qribbon__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(143, 161, 196, 0.28);
+}
+
+.qribbon__tick {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  border-radius: 1px;
+}
+
+.qribbon__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.qribbon__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.qribbon__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.qribbon__dot,
+.probe-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.qribbon__dot--zone {
+  background: rgba(143, 161, 196, 0.5);
+}
+
+.probe-dot {
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+.stats {
+  margin: 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stats__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.stats__row dt {
+  color: var(--text-dim);
+}
+
+.stats__row dd {
+  margin: 0;
+  text-align: right;
+}

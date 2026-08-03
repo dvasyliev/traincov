@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "pipeline": "tsx scripts/pipeline/index.ts",
+    "analyze": "tsx scripts/analyze-session.ts",
     "icons": "tsx scripts/icons/generate.ts",
     "dev:https": "HTTPS=true vite",
     "build": "tsc -b && vite build",

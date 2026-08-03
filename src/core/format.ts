@@ -20,6 +20,27 @@ export function formatClock(epoch: number | null): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+const MONTHS = [
+  'січ',
+  'лют',
+  'бер',
+  'квіт',
+  'трав',
+  'черв',
+  'лип',
+  'серп',
+  'вер',
+  'жовт',
+  'лист',
+  'груд',
+];
+
+/** `3 серп · 14:35` — мітка сесії в логах. Без Intl: локаль телефона тут ні до чого. */
+export function formatDateTime(epoch: number): string {
+  const d = new Date(epoch);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} · ${formatClock(epoch)}`;
+}
+
 /**
  * Зворотний відлік. До години — `4:20` (секунди в дорозі важливі: діра близько),
  * далі — `1 год 12 хв`, бо секунди там усе одно нічого не означають.

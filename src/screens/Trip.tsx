@@ -8,16 +8,19 @@ import { useAppActions, useAppState } from '../app/app-state';
 import { useEtaStore } from '../app/useEta';
 import { useTripTracker, useTripTracking } from '../app/useTrip';
 import { useTripSession, useTripSessionSync } from '../app/useTripSession';
+import { useProbeLogger } from '../app/useProbeLogger';
 import { setTripSession } from '../core/trip-session';
 import { formatKm, formatTime } from '../core/format';
 import { operatorLabel } from '../core/operators';
+import { QUALITY_COLOR, QUALITY_LABEL } from '../core/measurements';
+import type { LoggerSnapshot } from '../core/probe-logger';
 import type { OperatorId } from '../core/operators';
 import type { DeadZone, RouteBundle } from '../core/types';
 
 type View = 'ribbon' | 'map';
 
 export function Trip() {
-  const { currentTrip, operator, savedTrips } = useAppState();
+  const { currentTrip, operator, savedTrips, logging } = useAppState();
 
   // Редірект робить App; сюди потрапляємо лише на кадр між dispatch і ререндером.
   if (!currentTrip) return null;
@@ -28,6 +31,7 @@ export function Trip() {
       key={currentTrip.tripId}
       bundle={currentTrip}
       operator={operator}
+      logging={logging}
       offlineReady={savedTrips.some((trip) => trip.tripId === currentTrip.tripId)}
     />
   );
@@ -36,11 +40,13 @@ export function Trip() {
 interface TripViewProps {
   bundle: RouteBundle;
   operator: OperatorId | null;
+  /** Тумблер логера замірів із налаштувань. */
+  logging: boolean;
   /** Пакет лежить у Dexie — рейс переживе airplane mode. */
   offlineReady: boolean;
 }
 
-function TripView({ bundle, operator, offlineReady }: TripViewProps) {
+function TripView({ bundle, operator, logging, offlineReady }: TripViewProps) {
   const { setScreen } = useAppActions();
   const tracker = useTripTracker(bundle);
   const etaStore = useEtaStore(tracker);
@@ -51,6 +57,7 @@ function TripView({ bundle, operator, offlineReady }: TripViewProps) {
 
   useTripSessionSync(tracker, bundle.tripId);
   const session = useTripSession();
+  const probeLog = useProbeLogger(tracker, operator, logging);
   // iOS вбив PWA посеред поїздки: трекера вже немає, а запис лишився.
   const interrupted = !tracking && session?.tripId === bundle.tripId;
 
@@ -71,6 +78,7 @@ function TripView({ bundle, operator, offlineReady }: TripViewProps) {
         {formatKm(bundle.lengthKm)} · {bundle.stops.length} зупинок ·{' '}
         {zonesCount ? `${zonesCount} мертвих зон` : 'зон не знайдено'}
         {offlineReady && <span className="badge badge--saved">📦 офлайн-готовий</span>}
+        <ProbeChip snapshot={probeLog} />
       </div>
 
       {interrupted && (
@@ -125,5 +133,27 @@ function TripView({ bundle, operator, offlineReady }: TripViewProps) {
 
       <ZoneSheet zone={zone} onClose={() => setZone(null)} />
     </div>
+  );
+}
+
+/**
+ * Крапка + лічильник замірів у підзаголовку. Логер працює мовчки, і без цієї
+ * крапки єдиний спосіб дізнатись, що він живий, — сходити на екран логера,
+ * тобто зупинити поїздку.
+ */
+function ProbeChip({ snapshot }: { snapshot: LoggerSnapshot }) {
+  if (!snapshot.running) return null;
+  const quality = snapshot.last?.quality;
+  const title = quality
+    ? `${QUALITY_LABEL[quality]}${snapshot.last?.rttMs === null ? '' : ` · ${snapshot.last?.rttMs} мс`}`
+    : 'перший замір…';
+  return (
+    <span className="badge badge--muted" title={title}>
+      <i
+        className="probe-dot"
+        style={{ background: quality ? QUALITY_COLOR[quality] : 'var(--text-dim)' }}
+      />
+      {snapshot.count}
+    </span>
   );
 }

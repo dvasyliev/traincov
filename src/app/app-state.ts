@@ -15,12 +15,21 @@ export interface AppState {
   savedTrips: SavedTrip[];
   /** tripId рейсу, який зараз завантажується (індикатор на картці). */
   loadingTripId: string | null;
+  /** Тумблер логера замірів (задача 08). За замовчуванням увімкнено. */
+  logging: boolean;
   toast: string | null;
 }
 
 export type AppAction =
-  | { type: 'hydrated'; operator: OperatorId | null; trip: RouteBundle | null; saved: SavedTrip[] }
+  | {
+      type: 'hydrated';
+      operator: OperatorId | null;
+      trip: RouteBundle | null;
+      saved: SavedTrip[];
+      logging: boolean;
+    }
   | { type: 'operator'; operator: OperatorId }
+  | { type: 'logging'; logging: boolean }
   | { type: 'screen'; screen: Screen }
   | { type: 'select-start'; tripId: string }
   | { type: 'select-done'; bundle: RouteBundle; screen: Screen; saved: SavedTrip[] }
@@ -35,6 +44,7 @@ export const initialAppState: AppState = {
   screen: 'home',
   savedTrips: [],
   loadingTripId: null,
+  logging: true,
   toast: null,
 };
 
@@ -47,9 +57,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         operator: action.operator,
         currentTrip: action.trip,
         savedTrips: action.saved,
+        logging: action.logging,
       };
     case 'operator':
       return { ...state, operator: action.operator };
+    case 'logging':
+      return { ...state, logging: action.logging };
     case 'screen':
       return { ...state, screen: action.screen };
     case 'select-start':
@@ -74,6 +87,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
 export interface AppActions {
   setOperator: (operator: OperatorId) => void;
+  setLogging: (logging: boolean) => void;
   setScreen: (screen: Screen) => void;
   /**
    * Бандл із Dexie або з мережі → Dexie → екран Trip.

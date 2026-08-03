@@ -2,20 +2,21 @@
 
 PWA, що для обраного залізничного рейсу в Польщі показує, **де і коли зникне мобільний інтернет**.
 
-План MVP — [docs/00-PLAN.md](docs/00-PLAN.md). Поточний стан: **задача 07** (офлайн: service
-worker, встановлюваний PWA, Wake Lock, карта без мережі у fallback-режимі).
+План MVP — [docs/00-PLAN.md](docs/00-PLAN.md). Поточний стан: **задача 08** (логер якості
+зв'язку: probe RTT у дорозі, експорт JSON, `npm run analyze` → сніпети для manual-zones).
 
 ## Запуск
 
 ```bash
 npm install
 npm run pipeline       # GTFS → public/data/ (потрібен один раз перед dev)
+npm run analyze -- traincov-….json   # лог поїздки → кластери мертвих зон
 npm run icons          # перегенерувати іконки PWA (тільки якщо міняєш малюнок)
 npm run dev            # http://localhost:5173  (і по LAN — host увімкнено)
 npm run dev:https      # те саме, але HTTPS (self-signed) — для тестів на телефоні
 npm run build          # tsc -b && vite build
 npm run preview        # прод-збірка локально, :4173
-npm test               # vitest: eta.ts, стрічка, прогон симулятора
+npm test               # vitest: eta.ts, стрічка, probe/логер, кластеризація сесій
 npm run typecheck
 npm run lint
 ```
@@ -63,6 +64,10 @@ http://localhost:5173/?sim=1&simKm=190       старт із 190-го км
   км їде далі за останньою швидкістю, поруч висить бейдж `км — оцінка`. Так перевіряється
   поведінка в тунелі.
 - Позиції йдуть із гаусовим шумом ~15 м, тож `offset` від колії на екрані ненульовий.
+- Логер замірів працює й у симуляторі: probe — справжній, км — віртуальні. У підзаголовку
+  «Дороги» цокає крапка з лічильником, а сесія позначається бейджем `sim`. Перевірка airplane
+  mode: вимкни мережу — probe починає фейлитись за мілісекунди, UI не підвисає, тики на стрічці
+  логера стають червоними.
 
 ## Дані маршрутів
 
@@ -87,6 +92,7 @@ public/data/
 ## Структура
 
 ```
+scripts/analyze-session.ts  лог поїздки → кластери мертвих зон → сніпет для manual-zones.json
 scripts/icons/     генератор іконок PWA (свій PNG-енкодер, без зовнішніх тулз)
 scripts/pipeline/  офлайн-пайплайн GTFS → бандли (Node + tsx, у браузері не працює)
   download.ts        кеш zip у .cache/ з TTL 24 год
@@ -103,18 +109,20 @@ scripts/pipeline/  офлайн-пайплайн GTFS → бандли (Node + t
 src/
   app/          таби (без react-router) + AppState: reducer, контекст, гідратація з Dexie
                 useTrip.ts — місток трекер ↔ React; useTripSession.ts (поїздка ↔ sessionStorage),
-                useAppUpdate.ts (банер нової версії)
-  screens/      Home.tsx (вибір рейсу), Trip.tsx (стрічка + карта), Log.tsx
+                useAppUpdate.ts (банер нової версії), useProbeLogger.ts (логер ↔ Dexie)
+  screens/      Home.tsx (вибір рейсу), Trip.tsx (стрічка + карта), Log.tsx (сесії замірів)
   components/   Map.tsx — єдине місце роботи з MapLibre; EtaHeader (countdown до діри),
                 RouteRibbon, TripStatusBar, TripCard, OperatorPicker, Toast, UpdateBanner,
-                ZoneSheet (деталі мертвої зони)
+                ZoneSheet (деталі мертвої зони), QualityRibbon (факт зв'язку по осі км)
   core/         чиста логіка без React:
                 types.ts, db.ts (Dexie), operators.ts, format.ts, trip-search.ts,
                 zones.ts (підписи й кольори зон, GeoJSON для карти),
                 linref.ts (GPS → км), speed.ts (EMA), geo-source.ts (watchPosition),
                 simulator.ts (?sim=1), trip-tracker.ts (стан поїздки як зовнішній стор),
                 eta.ts (прогноз), eta-status.ts (стан хедера), eta-store.ts, alerts.ts,
-                offline.ts (правила офлайну), wakelock.ts, trip-session.ts
+                offline.ts (правила офлайну), wakelock.ts, trip-session.ts,
+                measurements.ts (схема замірів), probe.ts (зондування),
+                probe-logger.ts (планувальник), share.ts (share sheet / download)
   data/         trip-index.ts (index.json + кеш), route-bundle.ts, http.ts
   hooks/        useOnlineStatus — банер «офлайн» на Home; useWakeLock; useThrottledValue
   styles/       global.css — тёмна тема, safe-area, 100dvh
@@ -255,11 +263,67 @@ Trip пропонує «Продовжити відстеження?».
 
 Чого немає і не буде у веб-версії: фонової роботи при погашеному екрані.
 
+### Логер якості зв'язку (задача 08)
+
+Браузер не дає рівень сигналу (dBm), тому якість міряємо **активним зондуванням**:
+раз на ~10 c маленький GET із таймаутом 4 c → RTT або фейл. Bandwidth не міряємо свідомо —
+важкі завантаження їдять трафік і батарею, а для «є/нема інтернету» досить RTT і втрат.
+Класифікація: `< 1500 мс` — good, `≥ 1500 мс` — poor, фейл — dead. ~0.3 МБ/год.
+
+**Ендпоінт.** За замовчуванням `https://www.gstatic.com/generate_204`. CORS-заголовків він не
+віддає (перевірено), тому запит іде `mode: 'no-cors'`: відповідь непрозора, RTT чесний, але
+редірект captive-порталу від справжньої відповіді не відрізнити. Свій ендпоінт кращий —
+`VITE_PROBE_URL` у `.env` (див. [.env.example](.env.example)); у v2 той самий Worker
+прийматиме заміри. `cache: 'no-store'` + кеш-бастер `?t=` обов'язкові, інакше SW відповість із
+кеша і RTT буде брехнею.
+
+**Що пишеться.** `{ts, lat, lng, acc, routeKm, kmEstimated, tripId, operator, probeOk,
+probeRttMs, effectiveType, inZoneId}`. Координати — **сирі**, не спроєктовані на колію.
+У тунелі GPS зникає разом зі зв'язком: тоді рядок іде без координат, але з dead-reckoning км і
+`kmEstimated: true` — це найцінніші рядки, вони й підтверджують діру. Не пишемо нічого при
+`off-route` і без дозволу на геолокацію: сміття в даних гірше за їх відсутність, бо виглядає як
+факт. У фоні (`visibilityState !== 'visible'`) probe не робиться — тротлені таймери міряли б не
+мережу, а політику браузера.
+
+**Сесії.** Одна поїздка = одна сесія (`tripId#startedAt`). Перехід на вкладку «Логер» знімає
+трекер (так влаштована задача 04), тому повернення на «Дорогу» протягом 15 хв **продовжує** ту
+саму сесію, а не починає нову. Сесія «фотографує» прогнозовані зони на старті: перегенерація
+пайплайна не має заднім числом переписувати те, з чим порівнювали факт. Ротація — останні
+20 000 замірів, ріжеться цілими сесіями від найстаріших.
+
+**Екран «Логер».** Тумблер збору (за замовчуванням on), список сесій, і для обраної —
+горизонтальна міні-стрічка: вісь км, сірі смуги = прогнозовані зони, кольорові тики = факт.
+Розбіжність між ними і є те, заради чого логер існує. Тиків не більше 200: у бакеті перемагає
+найгірший замір, бо саме поодинока діра й цікава.
+
+**Експорт** — `navigator.share` з файлом, а без Web Share Level 2 — `<a download>`. Схема
+зафіксована (`schema: 1`), її ж чекатиме бекенд у v2. Заміри обраної сесії тримаються в
+пам'яті: між тапом і викликом `share` не має бути жодного `await`, інакше iOS втратить жест.
+
+**Ручний цикл покращення даних** — краудсорсинг з одного користувача, повний цикл працює вже:
+
+```bash
+# 1. проїхав → експортував JSON з екрана «Логер»
+npm run analyze -- ~/Downloads/traincov-2026-08-03-1435-PLK_IC_2026_1.json
+# 2. скрипт друкує кластери dead-замірів і готовий сніпет rules[]
+# 3. вставив у scripts/pipeline/manual-zones.json → npm run pipeline → зони оновилися
+```
+
+[scripts/analyze-session.ts](scripts/analyze-session.ts) групує мертві заміри по км
+(`--gap 0.8`, `--min 2`), розсуває межі кластера до середини прогалини між крайнім мертвим і
+найближчим живим заміром (діра почалася десь там, і це чесніше за межі рівно по точках заміру),
+і позначає, чи кластер уже є в прогнозі. Сесії з `?sim=1` помічаються окремо — у
+manual-zones.json такі дані нести не можна.
+
+Чого немає: автозаливки на сервер і мержу чужих файлів — це v2.
+
 ### Стан і збереження
 
 - IndexedDB (Dexie, база `traincov`): `bundles` — завантажені маршрути, `savedTrips` — легкі
   картки цих маршрутів (щоб офлайн-список не піднімав у пам'ять десятки бандлів),
-  `settings` — `operator` і `lastTripId`. Обраний рейс і оператор відновлюються при старті.
+  `measurements` + `logSessions` — заміри якості зв'язку (задача 08),
+  `settings` — `operator`, `lastTripId`, `etaAlerts`, `probeLogging`. Обраний рейс і оператор
+  відновлюються при старті.
 - **Версіонування бандлів.** Кожен збережений бандл несе `schemaVersion`
   (`BUNDLE_SCHEMA_VERSION` у [src/core/db.ts](src/core/db.ts), піднімати при зміні формату) і
   `dataVersion` (`generatedAt` з index.json). Протухла копія видаляється при читанні, старий

@@ -41,6 +41,12 @@ export interface TripSnapshot {
   offsetM: number | null;
   /** Точка на колії — саме її показує карта. */
   snapped: [number, number] | null;
+  /**
+   * Сирий фікс, як його дав GPS. Карті він не потрібен (вона малює `snapped`),
+   * а логеру замірів — так: у файл має їхати те, що виміряв приймач, а не те,
+   * що з нього вийшло після проєкції на колію.
+   */
+  fix: { lat: number; lng: number; accuracyM: number } | null;
   lastFixTs: number | null;
   error: string | null;
   simulated: boolean;
@@ -71,6 +77,7 @@ function idleSnapshot(simulated: boolean): TripSnapshot {
     stoppedSince: null,
     offsetM: null,
     snapped: null,
+    fix: null,
     lastFixTs: null,
     error: null,
     simulated,
@@ -87,6 +94,7 @@ function same(a: TripSnapshot, b: TripSnapshot): boolean {
     a.confidence === b.confidence &&
     a.stoppedSince === b.stoppedSince &&
     a.offsetM === b.offsetM &&
+    a.fix === b.fix &&
     a.lastFixTs === b.lastFixTs &&
     a.error === b.error
   );
@@ -146,6 +154,7 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
       stoppedSince: speedState.stoppedSince,
       offsetM: Math.round(position.offsetM),
       snapped: position.snapped,
+      fix: { lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM },
       lastFixTs: fix.ts,
       error: null,
       simulated: snapshot.simulated,
@@ -182,6 +191,9 @@ export function createTripTracker(bundle: RouteBundle, source: GeoSource): TripT
       stoppedSince: speedState.stoppedSince,
       offsetM: snapshot.offsetM,
       snapped,
+      // Фікси протухли — координат більше немає. Саме така «діра з км, але без
+      // GPS» і є найціннішим рядком у логу замірів.
+      fix: stale ? null : snapshot.fix,
       lastFixTs: snapshot.lastFixTs,
       error: snapshot.error,
       simulated: snapshot.simulated,
